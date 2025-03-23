@@ -29,47 +29,83 @@ export function useFirebaseAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for auth state changes
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      setLoading(true);
-      if (authUser) {
-        setUser(authUser);
-        try {
-          const userDocRef = doc(db, 'profiles', authUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data());
-          } else {
-            // If profile doesn't exist but user is authenticated,
-            // create a basic profile
-            const defaultProfile = {
-              email: authUser.email,
-              first_name: authUser.displayName?.split(' ')[0] || '',
-              last_name: authUser.displayName?.split(' ').slice(1).join(' ') || '',
-              avatar_url: authUser.photoURL || '',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            
-            await updateProfile(authUser.uid, defaultProfile);
-            setUserProfile(defaultProfile);
-          }
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
-        }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-      }
+    // On the server or if Firebase isn't initialized, set loading to false and return
+    if (typeof window === 'undefined' || !auth) {
       setLoading(false);
+      return;
+    }
+
+    // Import auth-related functions only on the client
+    const importFirebaseAuthModules = async () => {
+      const { 
+        onAuthStateChanged,
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        signOut: firebaseSignOut
+      } = await import('firebase/auth');
+      
+      const { 
+        doc, 
+        getDoc, 
+        updateDoc, 
+        setDoc 
+      } = await import('firebase/firestore');
+
+      // Listen for auth state changes
+      const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+        setLoading(true);
+        if (authUser) {
+          setUser(authUser);
+          try {
+            const userDocRef = doc(db, 'profiles', authUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              setUserProfile(userDoc.data());
+            } else {
+              // If profile doesn't exist but user is authenticated,
+              // create a basic profile
+              const defaultProfile = {
+                email: authUser.email,
+                first_name: authUser.displayName?.split(' ')[0] || '',
+                last_name: authUser.displayName?.split(' ').slice(1).join(' ') || '',
+                avatar_url: authUser.photoURL || '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              await updateProfile(authUser.uid, defaultProfile);
+              setUserProfile(defaultProfile);
+            }
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+          }
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+        setLoading(false);
+      });
+
+      return unsubscribe;
+    };
+
+    // Call the async function and store the unsubscribe function
+    let unsubscribe: (() => void) | undefined;
+    importFirebaseAuthModules().then((unsub) => {
+      unsubscribe = unsub;
     });
 
     // Cleanup subscription on unmount
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   async function signIn(email: string, password: string) {
+    if (!auth) throw new Error('Firebase is not initialized');
+    
     try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential.user;
     } catch (error) {
@@ -79,7 +115,10 @@ export function useFirebaseAuth() {
   }
 
   async function signUp(email: string, password: string, userData: any) {
+    if (!auth || !db) throw new Error('Firebase is not initialized');
+    
     try {
+      const { createUserWithEmailAndPassword } = await import('firebase/auth');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
@@ -102,7 +141,10 @@ export function useFirebaseAuth() {
   }
 
   async function updateProfile(userId: string, profileData: any) {
+    if (!db) throw new Error('Firebase is not initialized');
+    
     try {
+      const { doc, getDoc, updateDoc, setDoc } = await import('firebase/firestore');
       const profileRef = doc(db, 'profiles', userId);
       
       // Check if profile exists first
@@ -114,9 +156,7 @@ export function useFirebaseAuth() {
           updated_at: new Date().toISOString()
         });
       } else {
-        // Use setDoc instead of updateDoc for new documents
-        // We need to import setDoc
-        const { setDoc } = await import('firebase/firestore');
+        // Use setDoc for new documents
         await setDoc(profileRef, {
           ...profileData,
           id: userId,
@@ -131,7 +171,10 @@ export function useFirebaseAuth() {
   }
 
   async function signOut() {
+    if (!auth) throw new Error('Firebase is not initialized');
+    
     try {
+      const { signOut: firebaseSignOut } = await import('firebase/auth');
       await firebaseSignOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);

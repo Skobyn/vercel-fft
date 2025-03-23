@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
@@ -35,9 +35,18 @@ const formSchema = z.object({
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn } = useAuth();
+  
+  // Only access useAuth hook after component is mounted
+  // This prevents SSR issues with Firebase initialization
+  const auth = isMounted ? useAuth() : { signIn: async () => { throw new Error('Auth not initialized') } };
+
+  // Set isMounted to true after component mounts
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Check if user just registered
   const registered = searchParams.get("registered") === "true";
@@ -57,8 +66,12 @@ export default function SignInPage() {
       setIsLoading(true);
       setError(null);
       
+      if (!isMounted) {
+        throw new Error("Application is still initializing. Please try again.");
+      }
+      
       // Sign in the user with Firebase
-      await signIn(values.email, values.password);
+      await auth.signIn(values.email, values.password);
       
       toast.success("Signed in successfully!");
       router.push("/dashboard");
@@ -134,7 +147,7 @@ export default function SignInPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading || !isMounted}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>

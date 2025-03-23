@@ -23,7 +23,17 @@ export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
 
   // Function to initialize a new user with default data
   const initializeNewUser = async (userId: string, householdName?: string) => {
-    await initializeUserData(userId, householdName);
+    // Ensure this function doesn't fail when running on the server
+    if (typeof window === 'undefined') {
+      console.warn('initializeNewUser called on the server - deferring to client');
+      return;
+    }
+    
+    try {
+      await initializeUserData(userId, householdName);
+    } catch (error) {
+      console.error('Error initializing user data:', error);
+    }
   };
 
   // Enhanced sign up function that also initializes user data
