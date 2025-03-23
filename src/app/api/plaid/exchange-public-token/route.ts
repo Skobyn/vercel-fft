@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check if user is authenticated via Firebase
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    if (!currentUser || !currentUser.uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

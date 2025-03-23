@@ -8,7 +8,7 @@ export async function POST() {
     // Check if user is authenticated via Firebase using getCurrentUser helper
     // This is safer for API routes than direct auth.currentUser access
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
+    if (!currentUser || !currentUser.uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
