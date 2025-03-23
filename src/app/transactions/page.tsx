@@ -26,10 +26,20 @@ import { useFirestoreData } from '@/hooks/use-firebase';
 import { useAuth } from '@/providers/firebase-auth-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { collection, query, orderBy, where, getDocs, Firestore } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { getFirestore } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 
-// Explicitly type db as Firestore or null to avoid type errors
-const firebaseDb: Firestore | null = db as Firestore | null;
+// Safely access Firestore on the client side only
+let firestoreDb: Firestore | null = null;
+
+// Initialize Firestore only in browser environment
+if (typeof window !== 'undefined') {
+  try {
+    firestoreDb = getFirestore(getApp());
+  } catch (error) {
+    console.error("Failed to initialize Firestore:", error);
+  }
+}
 
 interface Transaction {
   id: string;
@@ -93,12 +103,12 @@ export default function TransactionsPage() {
     const fetchAccounts = async () => {
       try {
         // Explicitly handle the case where db might be undefined
-        if (!firebaseDb) {
+        if (!firestoreDb) {
           console.error("Firebase database not initialized");
           return;
         }
         
-        const q = query(collection(firebaseDb, 'financial_accounts'));
+        const q = query(collection(firestoreDb, 'financial_accounts'));
         const querySnapshot = await getDocs(q);
         // Data would be loaded via the useFirestoreData hook
       } catch (error) {
@@ -109,12 +119,12 @@ export default function TransactionsPage() {
     const fetchCategories = async () => {
       try {
         // Explicitly handle the case where db might be undefined
-        if (!firebaseDb) {
+        if (!firestoreDb) {
           console.error("Firebase database not initialized");
           return;
         }
         
-        const q = query(collection(firebaseDb, 'categories'));
+        const q = query(collection(firestoreDb, 'categories'));
         const querySnapshot = await getDocs(q);
         // Data would be loaded via the useFirestoreData hook
       } catch (error) {
