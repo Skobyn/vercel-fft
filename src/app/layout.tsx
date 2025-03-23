@@ -6,7 +6,11 @@ import { AuthProvider } from "@/providers/auth-provider";
 import { FirebaseAuthProvider } from '@/providers/firebase-auth-provider';
 import { ThemeProvider } from "@/components/ui/theme-provider";
 
-const inter = Inter({ subsets: ["latin"] });
+// Configure Inter font
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: "Financial Flow - Family Finance Management",
@@ -20,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${inter.variable}`}>
+      <body className={`font-sans ${inter.className}`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <FirebaseAuthProvider>
             <AuthProvider>
