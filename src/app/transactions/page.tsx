@@ -26,7 +26,10 @@ import { useFirestoreData } from '@/hooks/use-firebase';
 import { useAuth } from '@/providers/firebase-auth-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { collection, query, orderBy, where, getDocs, Firestore } from 'firebase/firestore';
-import { db } from '@/lib/firebase-client';
+import { db as firebaseDb } from '@/lib/firebase-client';
+
+// Explicitly define the type for db
+const db: Firestore | null = firebaseDb;
 
 interface Transaction {
   id: string;
