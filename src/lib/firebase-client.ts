@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, User } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 // Only initialize Firebase in the browser environment
@@ -39,7 +39,7 @@ if (typeof window !== 'undefined') {
 export { db, auth, analytics };
 
 // Helper functions for common database operations
-export const getCurrentUser = async () => {
+export const getCurrentUser = async (): Promise<User | null> => {
   if (!auth) return null;
   
   return new Promise((resolve, reject) => {
