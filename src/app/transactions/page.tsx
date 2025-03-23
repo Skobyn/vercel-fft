@@ -25,7 +25,7 @@ import { TransactionForm } from './TransactionForm';
 import { useFirestoreData } from '@/hooks/use-firebase';
 import { useAuth } from '@/providers/firebase-auth-provider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, where, getDocs, Firestore } from 'firebase/firestore';
 import { db } from '@/lib/firebase-client';
 
 interface Transaction {
@@ -89,6 +89,12 @@ export default function TransactionsPage() {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
+        // Explicitly handle the case where db might be undefined
+        if (!db) {
+          console.error("Firebase database not initialized");
+          return;
+        }
+        
         const q = query(collection(db, 'financial_accounts'));
         const querySnapshot = await getDocs(q);
         // Data would be loaded via the useFirestoreData hook
@@ -99,6 +105,12 @@ export default function TransactionsPage() {
     
     const fetchCategories = async () => {
       try {
+        // Explicitly handle the case where db might be undefined
+        if (!db) {
+          console.error("Firebase database not initialized");
+          return;
+        }
+        
         const q = query(collection(db, 'categories'));
         const querySnapshot = await getDocs(q);
         // Data would be loaded via the useFirestoreData hook
