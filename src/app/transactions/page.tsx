@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, FilterIcon, Search, Plus, ArrowUpDown, ChevronDown } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -21,17 +21,35 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { DateRange } from "react-day-picker";
 import { ReceiptScanner } from "@/components/receipts/receipt-scanner";
+import { TransactionForm } from './TransactionForm';
+import { useFirestoreData } from '@/hooks/use-firebase';
+import { useAuth } from '@/providers/firebase-auth-provider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { collection, query, orderBy, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
 
-type Transaction = {
-  id: number;
-  date: string;
+interface Transaction {
+  id: string;
   description: string;
-  category: string;
   amount: number;
-  account: string;
-};
+  date: string;
+  is_income: boolean;
+  category_id: string;
+  account_id: string;
+  category?: {
+    name: string;
+  };
+  financial_account?: {
+    name: string;
+  };
+}
 
 export default function TransactionsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const { data: transactions, loading: transactionsLoading, fetchData } = useFirestoreData<Transaction>('transactions');
+  const { data: accounts } = useFirestoreData<any>('financial_accounts');
+  const { data: categories } = useFirestoreData<any>('categories');
+  
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -40,115 +58,95 @@ export default function TransactionsPage() {
   });
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // Sample transaction data
-  const transactions: Transaction[] = [
-    {
-      id: 1,
-      date: "2025-03-22",
-      description: "Grocery Store",
-      category: "Food & Dining",
-      amount: -120.45,
-      account: "Chase Checking",
-    },
-    {
-      id: 2,
-      date: "2025-03-20",
-      description: "Gas Station",
-      category: "Transportation",
-      amount: -45.67,
-      account: "Bank of America Credit Card",
-    },
-    {
-      id: 3,
-      date: "2025-03-18",
-      description: "Netflix",
-      category: "Entertainment",
-      amount: -15.99,
-      account: "Wells Fargo Credit Card",
-    },
-    {
-      id: 4,
-      date: "2025-03-15",
-      description: "Salary",
-      category: "Income",
-      amount: 2250.00,
-      account: "Chase Checking",
-    },
-    {
-      id: 5,
-      date: "2025-03-14",
-      description: "Restaurant",
-      category: "Food & Dining",
-      amount: -85.32,
-      account: "Bank of America Credit Card",
-    },
-    {
-      id: 6,
-      date: "2025-03-12",
-      description: "Internet Bill",
-      category: "Bills & Utilities",
-      amount: -69.99,
-      account: "Wells Fargo Checking",
-    },
-    {
-      id: 7,
-      date: "2025-03-10",
-      description: "Target",
-      category: "Shopping",
-      amount: -132.56,
-      account: "Chase Credit Card",
-    },
-    {
-      id: 8,
-      date: "2025-03-08",
-      description: "Side Project",
-      category: "Income",
-      amount: 350.00,
-      account: "Chase Checking",
-    },
-    {
-      id: 9,
-      date: "2025-03-05",
-      description: "Electric Bill",
-      category: "Bills & Utilities",
-      amount: -95.47,
-      account: "Wells Fargo Checking",
-    },
-    {
-      id: 10,
-      date: "2025-03-01",
-      description: "Mortgage",
-      category: "Housing",
-      amount: -1200.00,
-      account: "Wells Fargo Checking",
-    },
-  ];
+  // Load transactions when page loads
+  useEffect(() => {
+    if (user) {
+      fetchData((ref) => {
+        // Start with base query
+        let q = query(ref, orderBy('date', sortDirection === 'asc' ? 'asc' : 'desc'));
+        
+        // Add filters
+        if (selectedCategory) {
+          q = query(q, where('category_id', '==', selectedCategory));
+        }
+        
+        if (dateRange?.from) {
+          const fromDate = dateRange.from.toISOString().split('T')[0];
+          q = query(q, where('date', '>=', fromDate));
+        }
+        
+        if (dateRange?.to) {
+          const toDate = dateRange.to.toISOString().split('T')[0];
+          q = query(q, where('date', '<=', toDate));
+        }
+        
+        return q;
+      });
+    }
+  }, [user, fetchData, sortDirection, selectedCategory, dateRange]);
 
-  // Get unique categories for the filter
-  const categories = Array.from(new Set(transactions.map(t => t.category)));
+  // Also load accounts and categories
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const q = query(collection(db, 'financial_accounts'));
+        const querySnapshot = await getDocs(q);
+        // Data would be loaded via the useFirestoreData hook
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+      }
+    };
+    
+    const fetchCategories = async () => {
+      try {
+        const q = query(collection(db, 'categories'));
+        const querySnapshot = await getDocs(q);
+        // Data would be loaded via the useFirestoreData hook
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    
+    if (user) {
+      fetchAccounts();
+      fetchCategories();
+    }
+  }, [user]);
 
-  // Filter transactions based on search, category, and date
-  const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = searchText === "" ||
-      transaction.description.toLowerCase().includes(searchText.toLowerCase()) ||
-      transaction.category.toLowerCase().includes(searchText.toLowerCase());
+  if (authLoading || transactionsLoading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
 
-    const matchesCategory = selectedCategory === null || transaction.category === selectedCategory;
+  if (!user) {
+    return <div className="flex justify-center items-center min-h-screen">Please sign in to view transactions</div>;
+  }
 
-    const transactionDate = new Date(transaction.date);
-    const matchesDateRange =
-      (!dateRange?.from || transactionDate >= dateRange.from) &&
-      (!dateRange?.to || transactionDate <= dateRange.to);
-
-    return matchesSearch && matchesCategory && matchesDateRange;
+  // Prepare data for display by joining with categories and accounts
+  const preparedTransactions = transactions?.map(transaction => {
+    // Find the category and account info
+    const category = categories?.find(c => c.id === transaction.category_id);
+    const account = accounts?.find(a => a.id === transaction.account_id);
+    
+    return {
+      ...transaction,
+      category: category ? { name: category.name } : { name: 'Uncategorized' },
+      financial_account: account ? { name: account.name } : { name: 'Unknown Account' }
+    };
   });
 
-  // Sort transactions by date
-  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
-    return sortDirection === "desc" ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
-  });
+  // Get unique categories for the filter (using the already fetched categories)
+  const categoryOptions = categories?.map(c => ({ id: c.id, name: c.name })) || [];
+
+  // Filter transactions based on search text
+  const filteredTransactions = preparedTransactions?.filter(transaction => {
+    if (!searchText) return true;
+    
+    const searchLower = searchText.toLowerCase();
+    return (
+      transaction.description.toLowerCase().includes(searchLower) ||
+      transaction.category?.name.toLowerCase().includes(searchLower)
+    );
+  }) || [];
 
   return (
     <MainLayout>
@@ -181,15 +179,18 @@ export default function TransactionsPage() {
           </div>
 
           <div className="flex flex-1 items-center gap-2">
-            <Select value={selectedCategory || ""} onValueChange={(value) => setSelectedCategory(value || null)}>
+            <Select 
+              value={selectedCategory || ""} 
+              onValueChange={(value) => setSelectedCategory(value || null)}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                {categoryOptions.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -249,56 +250,72 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Transaction History</CardTitle>
-              <div className="text-sm text-muted-foreground">
-                {sortedTransactions.length} transactions
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedTransactions.length > 0 ? (
-                  sortedTransactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{transaction.description}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{transaction.category}</Badge>
-                      </TableCell>
-                      <TableCell>{transaction.account}</TableCell>
-                      <TableCell className={cn(
-                        "text-right font-medium",
-                        transaction.amount > 0 ? "text-emerald-500" : "text-rose-500"
-                      )}>
-                        {transaction.amount > 0 ? "+" : ""}
-                        ${Math.abs(transaction.amount).toFixed(2)}
-                      </TableCell>
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="list">All Transactions</TabsTrigger>
+            <TabsTrigger value="add">Add Transaction</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="list">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>
+                  View your recent financial activity
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableCaption>A list of your recent transactions.</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      No transactions found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTransactions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center">No transactions found</TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredTransactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell>{format(new Date(transaction.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell>{transaction.category?.name || 'Uncategorized'}</TableCell>
+                          <TableCell>{transaction.financial_account?.name}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={transaction.is_income ? "secondary" : "default"}>
+                              {transaction.is_income ? '+' : '-'} ${Math.abs(transaction.amount).toFixed(2)}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="add">
+            <Card>
+              <CardHeader>
+                <CardTitle>Add Transaction</CardTitle>
+                <CardDescription>
+                  Record a new transaction in your account
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TransactionForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
