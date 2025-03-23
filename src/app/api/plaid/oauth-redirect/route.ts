@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { plaidClient } from '@/lib/plaid-client';
-import { auth } from '@/lib/firebase-client';
 
 /**
  * This route handles OAuth redirects from Plaid

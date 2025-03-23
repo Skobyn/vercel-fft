@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
 import { CountryCode, Products } from 'plaid';
-import { auth } from '@/lib/firebase-client';
+import { getCurrentUser } from '@/lib/firebase-client';
 
 export async function POST() {
   try {
-    // Check if user is authenticated via Firebase
-    const currentUser = auth?.currentUser;
+    // Check if user is authenticated via Firebase using getCurrentUser helper
+    // This is safer for API routes than direct auth.currentUser access
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
