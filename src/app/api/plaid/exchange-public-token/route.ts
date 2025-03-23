@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/lib/plaid-client';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { auth } from '@/lib/firebase-client';
+import { storePlaidToken } from '@/lib/plaid-firebase';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the authenticated user
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
+    // Check if user is authenticated via Firebase
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get the public token from the request body
     const body = await request.json();
-    const { publicToken } = body;
+    const { publicToken, institution } = body;
 
     if (!publicToken) {
       return NextResponse.json(
@@ -31,20 +30,25 @@ export async function POST(request: NextRequest) {
     const accessToken = tokenResponse.data.access_token;
     const itemId = tokenResponse.data.item_id;
 
-    // Here you would normally store the access token and item ID in your database
-    // associated with the current user
+    // Store the access token and item ID in Firestore
+    await storePlaidToken(
+      currentUser.uid,
+      accessToken,
+      itemId,
+      institution?.name
+    );
 
-    // For demo purposes, we're just returning success
+    // Return success response
     return NextResponse.json({
       success: true,
       message: 'Account successfully linked',
       itemId,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error exchanging public token:', error);
     return NextResponse.json(
-      { error: 'Failed to exchange token' },
+      { error: 'Failed to exchange token', details: error.message },
       { status: 500 }
     );
   }
