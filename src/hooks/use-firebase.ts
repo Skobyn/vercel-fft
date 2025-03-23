@@ -12,7 +12,8 @@ import {
   DocumentData,
   Query,
   DocumentReference,
-  getDoc
+  getDoc,
+  Firestore
 } from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
@@ -21,7 +22,10 @@ import {
   onAuthStateChanged,
   User
 } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase-client';
+import { db as firebaseDb, auth } from '@/lib/firebase-client';
+
+// Explicitly type the db variable
+const db: Firestore | null = firebaseDb;
 
 export function useFirebaseAuth() {
   const [user, setUser] = useState<User | null>(null);
