@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
