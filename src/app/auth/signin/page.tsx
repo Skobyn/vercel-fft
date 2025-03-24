@@ -30,7 +30,7 @@ export default function SignInPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const { user, loading } = useAuth();
-  const hasCheckedAuth = useRef(false);
+  const authCheckRef = useRef(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,19 +51,26 @@ export default function SignInPage() {
 
   // Handle redirect if already authenticated
   useEffect(() => {
-    // Skip if we've already checked
-    if (hasCheckedAuth.current) return;
-    
-    // Skip while loading
-    if (loading) return;
+    // Skip if we've already checked or still loading
+    if (authCheckRef.current || loading) return;
     
     // Mark that we've checked auth state
-    hasCheckedAuth.current = true;
+    authCheckRef.current = true;
+    
+    console.log("Signin page auth check - User:", user ? "authenticated" : "not authenticated");
     
     // If we have a user, redirect to dashboard
     if (user) {
-      console.log("Already signed in as:", user.email);
+      console.log("User already authenticated, redirecting to dashboard");
       router.push("/dashboard");
+      
+      // Fallback redirection
+      setTimeout(() => {
+        if (window.location.pathname.includes("/auth/signin")) {
+          console.log("Fallback navigation to dashboard");
+          window.location.href = "/dashboard";
+        }
+      }, 1000);
     }
   }, [user, loading, router]);
 
@@ -102,23 +109,36 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Store auth info in localStorage for persistence
-      const userData = {
+      // Log the user Firebase created
+      console.log("Firebase user:", {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem('auth_user', JSON.stringify(userData));
+      });
       
-      // Redirect to dashboard - use both approaches to ensure it works
-      console.log("Redirecting to dashboard");
-      router.push("/dashboard");
-      
-      // Give router.push() a chance to work, then fall back to direct navigation
-      setTimeout(() => {
+      // Use multiple redirection methods to ensure it works
+      try {
+        // Method 1: Next.js router
+        router.push("/dashboard");
+        
+        // Method 2: Direct navigation with a delay to allow firebase auth to update
+        setTimeout(() => {
+          console.log("Executing fallback navigation to dashboard");
+          window.location.href = "/dashboard";
+        }, 500);
+        
+        // Method 3: Extra fallback in case the above methods don't work
+        setTimeout(() => {
+          if (window.location.pathname.includes("/auth/signin")) {
+            console.log("Executing emergency fallback navigation");
+            window.location.replace("/dashboard");
+          }
+        }, 2000);
+      } catch (navError) {
+        console.error("Navigation error:", navError);
+        // If router.push fails, use direct navigation
         window.location.href = "/dashboard";
-      }, 500);
+      }
 
     } catch (error) {
       console.error("Error signing in:", error);
@@ -213,6 +233,33 @@ export default function SignInPage() {
                 </a>
               </p>
             </div>
+            
+            {/* Debug button - hidden in production */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="mt-8 pt-4 border-t border-gray-200">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={() => {
+                    console.log("Debug Auth State:", { 
+                      user, 
+                      loading,
+                      authFromLocalStorage: localStorage.getItem('authUser'),
+                      firebaseInitialized: !!auth
+                    });
+                    
+                    if (user) {
+                      toast.success(`Signed in as: ${user.email}`);
+                    } else {
+                      toast.error("Not signed in");
+                    }
+                  }}
+                >
+                  Debug Auth State
+                </Button>
+              </div>
+            )}
           </form>
         </Form>
       </div>

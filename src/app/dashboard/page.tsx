@@ -16,63 +16,38 @@ import { toast } from "sonner";
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [localUser, setLocalUser] = useState<any>(null);
-  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   const [isLoading, setIsLoading] = useState(true);
+  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   const authCheckRef = useRef(false);
 
-  // Debug auth state
+  // Simplified auth check with a ref to prevent multiple checks
   useEffect(() => {
-    if (user) {
-      console.log("Dashboard: User authenticated from provider:", user.email);
-    } else if (loading) {
-      console.log("Dashboard: Auth state is still loading");
-    } else {
-      console.log("Dashboard: No user from auth provider");
-    }
-  }, [user, loading]);
-
-  // Simplified auth check - only redirect if definitely not authenticated
-  useEffect(() => {
-    // If we're still loading, wait
-    if (loading) {
-      console.log("Dashboard: Still loading auth state...");
-      return;
-    }
-
-    // If user is authenticated, show dashboard
-    if (user) {
-      console.log("Dashboard: User is authenticated, showing dashboard");
-      setIsLoading(false);
-      return;
-    }
-
-    // Check for cached user in localStorage
-    try {
-      const storedUserData = localStorage.getItem('auth_user');
-      if (storedUserData) {
-        const storedUser = JSON.parse(storedUserData);
-        console.log("Dashboard: Found stored user data", storedUser.email);
-        
-        // Only use if less than 24 hours old
-        const timestamp = storedUser.timestamp || 0;
-        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-          setLocalUser(storedUser);
-          setIsLoading(false);
-          return;
-        } else {
-          console.log("Dashboard: Stored user data expired, clearing");
-          localStorage.removeItem('auth_user');
-        }
+    // Skip if we've already checked
+    if (authCheckRef.current) return;
+    
+    console.log("Dashboard auth check - User:", user ? "authenticated" : "not authenticated", "Loading:", loading);
+    
+    if (!loading) {
+      authCheckRef.current = true;
+      
+      if (!user) {
+        // No user even after loading completes - redirect to sign in
+        console.log("No authenticated user found, redirecting to signin");
+        router.push("/auth/signin");
+      } else {
+        // User is authenticated, show dashboard
+        console.log("User is authenticated, showing dashboard");
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.error("Dashboard: Error reading localStorage", e);
     }
-
-    // No authentication found, redirect to sign-in
-    console.log("Dashboard: No authentication found, redirecting to sign-in");
-    router.push('/auth/signin');
   }, [user, loading, router]);
+
+  // Once auth check is complete and user is verified, stop showing loading state
+  useEffect(() => {
+    if (!loading && user) {
+      setIsLoading(false);
+    }
+  }, [loading, user]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -86,9 +61,8 @@ export default function DashboardPage() {
     );
   }
 
-  // User is authenticated through Firebase or localStorage
-  const activeUser = user || localUser;
-  if (!activeUser) {
+  // User should be authenticated if we got this far
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center p-6 max-w-md">
