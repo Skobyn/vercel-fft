@@ -1,15 +1,15 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth, User } from 'firebase/auth';
-import { getAnalytics, isSupported } from 'firebase/analytics';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth, User } from 'firebase/auth';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 // Only initialize Firebase in the browser environment
 // This prevents SSR/build errors when environment variables aren't available
 
-let app;
-let db;
-let auth;
-let analytics = null;
+let app: FirebaseApp | undefined;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
+let analytics: Analytics | null = null;
 
 // Check if we're in the browser environment
 if (typeof window !== 'undefined') {
