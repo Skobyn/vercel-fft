@@ -77,18 +77,13 @@ export default function SignInPage() {
     try {
       await signInWithEmailAndPassword(auth!, values.email, values.password);
       
-      // Show success message and wait for it to be visible
-      await new Promise(resolve => {
-        toast.success("Signed in successfully!", {
-          onAutoClose: resolve,
-          duration: 2000
-        });
-      });
-
-      // Wait a moment for the toast to be visible before redirecting
+      toast.success("Signed in successfully!");
+      
+      // Redirect after a short delay
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 500);
+      }, 1500);
+
     } catch (error) {
       console.error("Error signing in:", error);
       if (error instanceof Error) {
@@ -107,6 +102,7 @@ export default function SignInPage() {
       } else {
         toast.error("Failed to sign in. Please check your credentials.");
       }
+    } finally {
       setIsSubmitting(false);
     }
   }
