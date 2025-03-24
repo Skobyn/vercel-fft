@@ -95,7 +95,7 @@ export default function SignInPage() {
     }
 
     setIsSubmitting(true);
-    console.log("Attempting to sign in with email...");
+    console.log("Attempting to sign in with email:", values.email);
     
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -107,9 +107,9 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Redirect immediately after successful sign-in
-      console.log("Redirecting to dashboard...");
-      router.push("/dashboard");
+      // Force navigation to dashboard
+      console.log("Forcing navigation to dashboard...");
+      window.location.href = "/dashboard";
 
     } catch (error) {
       console.error("Error signing in:", error);
@@ -125,8 +125,10 @@ export default function SignInPage() {
                 (letter) => letter.toUpperCase()
               )
           : error.message;
+        console.error("Formatted error message:", errorMessage);
         toast.error(errorMessage);
       } else {
+        console.error("Unknown error type:", typeof error);
         toast.error("Failed to sign in. Please check your credentials.");
       }
     } finally {
