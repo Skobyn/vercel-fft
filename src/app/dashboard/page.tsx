@@ -18,118 +18,39 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
-  const authCheckRef = useRef(false);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
 
-  // Simplified auth check with anti-refresh-loop protection
+  // Simplified auth handling - just log state without redirects
   useEffect(() => {
-    // Skip if we've already checked
-    if (authCheckRef.current) return;
+    console.log("Dashboard auth state:", { 
+      user: user ? `${user.email} (${user.id})` : "null", 
+      loading,
+      pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+      localStorage: typeof window !== 'undefined' ? !!localStorage.getItem("authUser") : false
+    });
     
-    // Don't do anything while still loading
-    if (loading) return;
-    
-    console.log("Dashboard auth check - User:", user ? `authenticated: ${user.email}` : "not authenticated", "Loading:", loading);
-    
-    // Check if we're in a refresh loop
-    const refreshCount = parseInt(sessionStorage.getItem('dashboard_refresh_count') || '0');
-    const lastRefresh = parseInt(sessionStorage.getItem('dashboard_last_refresh') || '0');
-    const now = Date.now();
-    
-    // If we're refreshing too quickly (multiple times within 3 seconds)
-    if (refreshCount > 3 && now - lastRefresh < 3000) {
-      console.warn("Detected potential refresh loop, showing dashboard anyway");
-      sessionStorage.setItem('refresh_loop_detected', 'true');
+    // Always show content after a short delay
+    const timer = setTimeout(() => {
       setIsLoading(false);
-      return;
-    }
-    
-    // Update refresh tracking
-    sessionStorage.setItem('dashboard_refresh_count', (refreshCount + 1).toString());
-    sessionStorage.setItem('dashboard_last_refresh', now.toString());
-    
-    // Mark that we've checked auth
-    authCheckRef.current = true;
-    
-    // Check for cached user in localStorage as fallback
-    if (!user) {
-      try {
-        const cachedUser = localStorage.getItem('authUser');
-        if (cachedUser) {
-          console.log("Using cached user from localStorage");
-          setIsLoading(false);
-          return;
-        }
-        
-        // No user found - redirect to signin unless we've detected a refresh loop
-        if (sessionStorage.getItem('refresh_loop_detected') !== 'true') {
-          console.log("No authenticated user found, redirecting to signin");
-          // Clear refresh tracking before redirecting
-          sessionStorage.removeItem('dashboard_refresh_count');
-          sessionStorage.removeItem('dashboard_last_refresh');
-          router.push("/auth/signin");
-        } else {
-          console.log("Refresh loop detected, showing dashboard without user");
-          setIsLoading(false);
-        }
-      } catch (e) {
-        console.error("Error checking localStorage:", e);
-        setIsLoading(false);
-      }
-    } else {
-      // User is authenticated, show dashboard
-      console.log("User is authenticated, showing dashboard");
-      setIsLoading(false);
-    }
-  }, [user, loading, router]);
-
-  // Clear refresh loop detection when component is mounted
-  useEffect(() => {
-    // Reset refresh detection if it's been more than 10 seconds since last visit
-    const lastVisit = parseInt(sessionStorage.getItem('dashboard_last_visit') || '0');
-    const now = Date.now();
-    
-    if (now - lastVisit > 10000) {
-      sessionStorage.removeItem('refresh_loop_detected');
-      sessionStorage.removeItem('dashboard_refresh_count');
-    }
-    
-    sessionStorage.setItem('dashboard_last_visit', now.toString());
-    
-    return () => {
-      // If we've successfully stayed on the dashboard for 5 seconds, clear the refresh detection
-      const timeoutId = setTimeout(() => {
-        sessionStorage.removeItem('refresh_loop_detected');
-        sessionStorage.removeItem('dashboard_refresh_count');
-      }, 5000);
       
-      return () => clearTimeout(timeoutId);
-    };
-  }, []);
+      // If no user is present after loading, show a toast
+      if (!loading && !user) {
+        console.log("No authenticated user found, but showing dashboard anyway");
+        toast.warning("You are viewing in demo mode. Some features may be limited.");
+        setIsUsingFallback(true);
+      }
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [user, loading]);
 
-  // Show loading state while checking auth
+  // Show loading state briefly
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-2 text-sm text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // User should be authenticated if we got this far, but handle the case when they aren't
-  if (!user && sessionStorage.getItem('refresh_loop_detected') !== 'true') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center p-6 max-w-md">
-          <h2 className="text-xl font-bold mb-2">Authentication Required</h2>
-          <p className="text-gray-500 mb-4">
-            You need to be signed in to view this page. Please sign in to continue.
-          </p>
-          <Button onClick={() => router.push('/auth/signin')}>
-            Sign In
-          </Button>
         </div>
       </div>
     );
@@ -217,6 +138,23 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
+      {isUsingFallback && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-6">
+          <h3 className="font-medium">Demo Mode Active</h3>
+          <p className="text-sm mt-1">
+            You are viewing the dashboard in demo mode. 
+            <Button
+              variant="link"
+              className="h-auto p-0 ml-2 text-amber-800 underline"
+              onClick={() => router.push('/auth/signin')}
+            >
+              Sign in
+            </Button>
+            to access all features.
+          </p>
+        </div>
+      )}
+      
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>

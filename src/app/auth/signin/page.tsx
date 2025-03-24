@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/providers/firebase-auth-provider";
 
 const formSchema = z.object({
@@ -28,9 +28,7 @@ const formSchema = z.object({
 export default function SignInPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const { user, loading } = useAuth();
-  const authCheckRef = useRef(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,67 +39,29 @@ export default function SignInPage() {
     mode: "onChange",
   });
 
-  // Check URL parameters and show welcome message
+  // If user is already authenticated, redirect to dashboard
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('registered') === 'true') {
-      toast.success("Account created! Please sign in with your credentials.");
-    }
-  }, []);
-
-  // Clear refresh loop detection on signin page
-  useEffect(() => {
-    // Clear refresh loop detection when the user intentionally visits the signin page
-    sessionStorage.removeItem('refresh_loop_detected');
-    sessionStorage.removeItem('dashboard_refresh_count');
-    
-    // Mark this page as just visited to prevent immediate redirects
-    sessionStorage.setItem('signin_page_visited', Date.now().toString());
-  }, []);
-
-  // Handle redirect if already authenticated
-  useEffect(() => {
-    // Skip if we've already checked or still loading
-    if (authCheckRef.current || loading) return;
-    
-    // Mark that we've checked auth state
-    authCheckRef.current = true;
-    
-    console.log("Signin page auth check - User:", user ? `authenticated: ${user.email}` : "not authenticated");
-    
-    // If we have a user, redirect to dashboard
-    if (user) {
+    if (!loading && user) {
       console.log("User already authenticated, redirecting to dashboard");
-      
-      // Set a flag to indicate intentional navigation from sign-in to dashboard
-      sessionStorage.setItem('auth_redirect_from_signin', 'true');
-      
-      // Use the router for client-side navigation
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
-  // Check if Firebase Auth is initialized
+  // Clear any session storage flags when arriving at sign-in page
   useEffect(() => {
-    if (auth) {
-      console.log("Auth is initialized");
-      setIsAuthInitialized(true);
-    } else {
-      console.log("Auth is not initialized");
+    if (typeof window !== 'undefined') {
+      sessionStorage.clear();
     }
   }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("Starting sign in process...");
-    setIsSubmitting(true);
-    
-    // Validate auth initialization
-    if (!isAuthInitialized || !auth) {
-      console.error("Firebase Auth is not initialized");
-      toast.error("Authentication service is not available. Please try again later.");
-      setIsSubmitting(false);
+    if (!auth) {
+      toast.error("Authentication service is not available");
       return;
     }
+
+    console.log("Starting sign in process...");
+    setIsSubmitting(true);
     
     try {
       console.log(`Attempting to sign in with email: ${values.email}`);
@@ -116,57 +76,28 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Log the user Firebase created
-      console.log("Firebase user:", {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-      });
-      
-      // Set a flag to indicate successful authentication
-      sessionStorage.setItem('just_authenticated', 'true');
-      sessionStorage.setItem('auth_redirect_from_signin', 'true');
-      
-      // Clear any potential refresh loop detection
-      sessionStorage.removeItem('refresh_loop_detected');
-      sessionStorage.removeItem('dashboard_refresh_count');
-      
-      // Use multiple redirection methods to ensure it works
-      try {
-        // Method 1: Next.js router
-        router.push("/dashboard");
-        
-        // Method 2: Direct navigation after a delay to allow Firebase auth to update
-        setTimeout(() => {
-          console.log("Executing fallback navigation to dashboard");
-          window.location.href = "/dashboard";
-        }, 500);
-      } catch (navError) {
-        console.error("Navigation error:", navError);
-        // If router.push fails, use direct navigation
-        window.location.href = "/dashboard";
-      }
-
+      // Simple and direct redirect approach
+      console.log("Redirecting to dashboard");
+      window.location.href = "/dashboard";
     } catch (error) {
       console.error("Error signing in:", error);
+      
+      let errorMessage = "Failed to sign in. Please check your credentials.";
+      
       if (error instanceof Error) {
-        // Handle specific Firebase Auth errors
-        const errorMessage = error.message.includes("auth/")
-          ? error.message
-              .split("auth/")[1]
-              .split(")")[0]
-              .replace(/-/g, " ")
-              .replace(
-                /(^\w{1})|(\s+\w{1})/g,
-                (letter) => letter.toUpperCase()
-              )
-          : error.message;
-        console.error("Formatted error message:", errorMessage);
-        toast.error(errorMessage);
-      } else {
-        console.error("Unknown error type:", typeof error);
-        toast.error("Failed to sign in. Please check your credentials.");
+        errorMessage = error.message;
+        // Try to extract a more user-friendly message from Firebase errors
+        if (error.message.includes("auth/")) {
+          const errorCode = error.message.split("auth/")[1].split(")")[0];
+          errorMessage = errorCode.replace(/-/g, " ").replace(
+            /(^\w{1})|(\s+\w{1})/g,
+            (letter) => letter.toUpperCase()
+          );
+        }
       }
+      
+      console.error("Formatted error message:", errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -241,7 +172,7 @@ export default function SignInPage() {
               </p>
             </div>
             
-            {/* Debug button - hidden in production */}
+            {/* Debug button for development */}
             {process.env.NODE_ENV !== 'production' && (
               <div className="mt-8 pt-4 border-t border-gray-200">
                 <Button 
@@ -252,8 +183,7 @@ export default function SignInPage() {
                     console.log("Debug Auth State:", { 
                       user, 
                       loading,
-                      authFromLocalStorage: localStorage.getItem('authUser'),
-                      firebaseInitialized: !!auth
+                      authFromLocalStorage: localStorage.getItem('authUser')
                     });
                     
                     if (user) {
@@ -261,9 +191,12 @@ export default function SignInPage() {
                     } else {
                       toast.error("Not signed in");
                     }
+                    
+                    // Add a button to go directly to dashboard in demo mode
+                    window.location.href = "/dashboard";
                   }}
                 >
-                  Debug Auth State
+                  Debug Auth State & Go to Dashboard
                 </Button>
               </div>
             )}

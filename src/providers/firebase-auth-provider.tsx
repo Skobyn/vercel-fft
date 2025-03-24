@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase-client';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { User, mapFirebaseUser } from '@/types/user';
@@ -66,7 +65,6 @@ const safeRemoveItem = (key: string): boolean => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const initialized = useRef(false);
 
   // Initialize auth state
@@ -88,16 +86,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
+    // Handle case where there's no window or auth object
     if (typeof window === 'undefined' || !auth) {
       console.log("Auth provider: No window or auth object");
       setLoading(false);
       return () => {};
     }
     
+    // Set up Firebase auth state listener
     console.log("Setting up auth state listener...");
     const unsubscribe = onAuthStateChanged(auth, 
       (authUser) => {
-        console.log("Auth state changed", authUser ? `user exists: ${authUser.email}` : "no user");
+        console.log("Auth state changed:", authUser ? `user exists: ${authUser.email}` : "no user");
         
         if (authUser) {
           try {
@@ -105,15 +105,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(mappedUser);
             safeSetItem("authUser", JSON.stringify(mappedUser));
             console.log("User set from Firebase auth:", mappedUser.email);
-            
-            // Check if we need to redirect after authentication
-            if (typeof window !== 'undefined' && 
-                window.location.pathname.includes('/auth/signin') && 
-                sessionStorage.getItem('just_authenticated') === 'true') {
-              console.log("Redirecting after fresh authentication");
-              sessionStorage.removeItem('just_authenticated');
-              window.location.href = "/dashboard";
-            }
           } catch (error) {
             console.error("Error mapping user:", error);
           }
@@ -123,32 +114,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("User cleared from state and localStorage");
         }
         
+        // Set loading to false regardless of the auth state
         setLoading(false);
       }, 
       (error) => {
         console.error("Auth state change error:", error);
+        // Set loading to false on error
         setLoading(false);
       }
     );
 
+    // Return cleanup function to unsubscribe from auth listener
     return () => {
       console.log("Cleaning up auth state listener");
       unsubscribe();
     };
   }, []);
 
-  const value = {
-    user,
-    loading,
-  };
-
-  console.log("Auth provider state:", { 
-    user: user ? `${user.email} (${user.id})` : 'null', 
-    loading 
-  });
+  // Log authentication state for debugging
+  useEffect(() => {
+    console.log("Auth provider state:", { 
+      user: user ? `${user.email} (${user.id})` : 'null', 
+      loading 
+    });
+  }, [user, loading]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
