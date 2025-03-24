@@ -21,75 +21,58 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const authCheckRef = useRef(false);
 
-  // Check auth status on mount - but only once
+  // Debug auth state
   useEffect(() => {
-    // If we've already run the check, don't run it again
-    if (authCheckRef.current) return;
-    authCheckRef.current = true;
-    
-    console.log("Dashboard: Initial auth check");
-    
-    // Check if we just signed in
-    const justSignedIn = sessionStorage.getItem('just_signed_in');
-    if (justSignedIn) {
-      console.log("Dashboard: Just signed in, clearing flag");
-      sessionStorage.removeItem('just_signed_in');
+    if (user) {
+      console.log("Dashboard: User authenticated from provider:", user.email);
+    } else if (loading) {
+      console.log("Dashboard: Auth state is still loading");
+    } else {
+      console.log("Dashboard: No user from auth provider");
+    }
+  }, [user, loading]);
+
+  // Simplified auth check - only redirect if definitely not authenticated
+  useEffect(() => {
+    // If we're still loading, wait
+    if (loading) {
+      console.log("Dashboard: Still loading auth state...");
+      return;
+    }
+
+    // If user is authenticated, show dashboard
+    if (user) {
+      console.log("Dashboard: User is authenticated, showing dashboard");
       setIsLoading(false);
       return;
     }
-    
-    // Clear all redirect tracking flags to start fresh
-    sessionStorage.removeItem('redirect_count');
-    sessionStorage.removeItem('redirect_loop_blocker');
-    
-    // Wait a bit for Firebase auth to initialize fully
-    setTimeout(() => {
-      // If Firebase auth shows a user, we're authenticated
-      if (user) {
-        console.log("Dashboard: Firebase user is authenticated");
-        setIsLoading(false);
-        return;
-      }
-      
-      // Otherwise check localStorage for a user
-      try {
-        const storedUserData = localStorage.getItem('auth_user');
-        if (storedUserData) {
-          const storedUser = JSON.parse(storedUserData);
-          // Check if the stored data isn't too old (24 hour expiry)
-          const userTimestamp = storedUser.timestamp || 0;
-          if (Date.now() - userTimestamp < 24 * 60 * 60 * 1000) {
-            console.log("Dashboard: Using stored user data");
-            setLocalUser(storedUser);
-            setIsLoading(false);
-            return;
-          } else {
-            console.log("Dashboard: Stored user data expired");
-            localStorage.removeItem('auth_user');
-          }
+
+    // Check for cached user in localStorage
+    try {
+      const storedUserData = localStorage.getItem('auth_user');
+      if (storedUserData) {
+        const storedUser = JSON.parse(storedUserData);
+        console.log("Dashboard: Found stored user data", storedUser.email);
+        
+        // Only use if less than 24 hours old
+        const timestamp = storedUser.timestamp || 0;
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          setLocalUser(storedUser);
+          setIsLoading(false);
+          return;
+        } else {
+          console.log("Dashboard: Stored user data expired, clearing");
+          localStorage.removeItem('auth_user');
         }
-      } catch (e) {
-        console.error("Dashboard: Error reading localStorage", e);
-        localStorage.removeItem('auth_user');
       }
-      
-      // If we get here, we're not authenticated - go to signin
-      if (!loading) {
-        console.log("Dashboard: No authenticated user found");
-        window.location.href = '/auth/signin';
-      } else {
-        // Still loading, wait a bit more
-        setTimeout(() => {
-          if (!user) {
-            console.log("Dashboard: Still no user after delay");
-            window.location.href = '/auth/signin';
-          } else {
-            setIsLoading(false);
-          }
-        }, 1000);
-      }
-    }, 500);
-  }, [loading]); // Only dependency is loading
+    } catch (e) {
+      console.error("Dashboard: Error reading localStorage", e);
+    }
+
+    // No authentication found, redirect to sign-in
+    console.log("Dashboard: No authentication found, redirecting to sign-in");
+    router.push('/auth/signin');
+  }, [user, loading, router]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -113,7 +96,7 @@ export default function DashboardPage() {
           <p className="text-gray-500 mb-4">
             You need to be signed in to view this page. Please sign in to continue.
           </p>
-          <Button onClick={() => window.location.href = '/auth/signin'}>
+          <Button onClick={() => router.push('/auth/signin')}>
             Sign In
           </Button>
         </div>

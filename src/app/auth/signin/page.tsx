@@ -30,7 +30,7 @@ export default function SignInPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const { user, loading } = useAuth();
-  const redirectChecked = useRef(false);
+  const hasCheckedAuth = useRef(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,61 +49,23 @@ export default function SignInPage() {
     }
   }, []);
 
-  // Redirect if user is already signed in - BUT ONLY ONCE
+  // Handle redirect if already authenticated
   useEffect(() => {
-    // Only run this check once to prevent loops
-    if (redirectChecked.current) return;
-    redirectChecked.current = true;
+    // Skip if we've already checked
+    if (hasCheckedAuth.current) return;
     
-    // If we're loading, don't do anything yet
+    // Skip while loading
     if (loading) return;
     
-    // Clear any existing redirect flags to start fresh
-    sessionStorage.removeItem('redirect_count');
+    // Mark that we've checked auth state
+    hasCheckedAuth.current = true;
     
-    // Check if we're coming from a successful sign-in
-    const justSignedIn = sessionStorage.getItem('just_signed_in');
-    if (justSignedIn) {
-      console.log("Just signed in flag found, redirecting to dashboard");
-      sessionStorage.removeItem('just_signed_in');
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 100);
-      return;
-    }
-    
-    // If there's a logged-in user, redirect to dashboard
+    // If we have a user, redirect to dashboard
     if (user) {
-      console.log("User already authenticated, redirecting to dashboard");
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 100);
-      return;
+      console.log("Already signed in as:", user.email);
+      router.push("/dashboard");
     }
-    
-    // As a fallback, check localStorage
-    try {
-      const storedUserData = localStorage.getItem('auth_user');
-      if (storedUserData) {
-        const storedUser = JSON.parse(storedUserData);
-        // Ensure the data isn't too old (24 hour expiry)
-        const userTimestamp = storedUser.timestamp || 0;
-        if (Date.now() - userTimestamp < 24 * 60 * 60 * 1000) {
-          console.log("Found stored user data, redirecting");
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 100);
-          return;
-        } else {
-          console.log("Stored user data expired, clearing");
-          localStorage.removeItem('auth_user');
-        }
-      }
-    } catch (e) {
-      console.error("Error parsing stored user data", e);
-      localStorage.removeItem('auth_user');
-    }
-  }, [loading]); // Only depend on loading, not on user or router
+  }, [user, loading, router]);
 
   // Check if Firebase Auth is initialized
   useEffect(() => {
@@ -119,6 +81,7 @@ export default function SignInPage() {
     console.log("Starting sign in process...");
     setIsSubmitting(true);
     
+    // Validate auth initialization
     if (!isAuthInitialized || !auth) {
       console.error("Firebase Auth is not initialized");
       toast.error("Authentication service is not available. Please try again later.");
@@ -128,6 +91,8 @@ export default function SignInPage() {
     
     try {
       console.log(`Attempting to sign in with email: ${values.email}`);
+      
+      // Sign in with Firebase
       const userCredential = await signInWithEmailAndPassword(
         auth as Auth,
         values.email,
@@ -137,7 +102,7 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Store auth info in localStorage
+      // Store auth info in localStorage for persistence
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
@@ -145,14 +110,15 @@ export default function SignInPage() {
         timestamp: Date.now(),
       };
       localStorage.setItem('auth_user', JSON.stringify(userData));
-      console.log("User data saved to localStorage", userData);
       
-      // Set a flag to prevent redirect loops
-      sessionStorage.setItem('just_signed_in', 'true');
-      sessionStorage.removeItem('redirect_count');
+      // Redirect to dashboard - use both approaches to ensure it works
+      console.log("Redirecting to dashboard");
+      router.push("/dashboard");
       
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
+      // Give router.push() a chance to work, then fall back to direct navigation
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 500);
 
     } catch (error) {
       console.error("Error signing in:", error);

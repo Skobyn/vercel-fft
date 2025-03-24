@@ -21,9 +21,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Handle auth state changes without redirections
+  // Check for cached user when initializing
   useEffect(() => {
-    console.log("Initializing auth provider...");
+    // First check if we already have a cached user in localStorage
+    // This gives us a faster initial state while waiting for Firebase
+    console.log("Initial auth check");
+    try {
+      const storedUserData = localStorage.getItem('auth_user');
+      if (storedUserData) {
+        const storedUser = JSON.parse(storedUserData);
+        // Only use if less than 24 hours old
+        const timestamp = storedUser.timestamp || 0;
+        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+          console.log("Using cached user from localStorage:", storedUser.email);
+          // Create a temporary user object from localStorage data
+          const tempUser = {
+            ...storedUser,
+            id: storedUser.uid,
+            // Add required FirebaseUser properties
+            emailVerified: false,
+            isAnonymous: false,
+            metadata: {},
+            providerData: [],
+            refreshToken: '',
+            tenantId: null,
+            delete: async () => { throw new Error('Not implemented'); },
+            getIdToken: async () => '',
+            getIdTokenResult: async () => ({ token: '' } as any),
+            reload: async () => {},
+            toJSON: () => ({}),
+          } as unknown as User;
+          
+          setUser(tempUser);
+        } else {
+          console.log("Stored user data expired");
+          localStorage.removeItem('auth_user');
+        }
+      }
+    } catch (e) {
+      console.error("Error reading localStorage:", e);
+    }
+  }, []);
+
+  // Handle Firebase auth state changes
+  useEffect(() => {
+    console.log("Initializing Firebase auth listener...");
     
     if (typeof window === 'undefined' || !auth) {
       console.log("Auth provider: No window or auth object");
@@ -41,9 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
         });
-        setUser(mapFirebaseUser(firebaseUser));
         
-        // Store auth info in localStorage
+        // Map the Firebase user to our User type
+        const mappedUser = mapFirebaseUser(firebaseUser);
+        setUser(mappedUser);
+        
+        // Store auth info in localStorage for persistence
         localStorage.setItem('auth_user', JSON.stringify({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -51,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           timestamp: Date.now(),
         }));
       } else {
-        console.log("Clearing user state");
+        console.log("No Firebase user found, clearing user state");
         setUser(null);
         localStorage.removeItem('auth_user');
       }
