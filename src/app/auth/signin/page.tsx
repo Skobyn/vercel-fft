@@ -107,8 +107,9 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // The auth state change will trigger the redirect
-      console.log("Waiting for auth state change to trigger redirect...");
+      // Redirect immediately after successful sign-in
+      console.log("Redirecting to dashboard...");
+      router.push("/dashboard");
 
     } catch (error) {
       console.error("Error signing in:", error);
