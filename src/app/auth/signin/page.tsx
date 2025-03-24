@@ -107,9 +107,24 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Force navigation to dashboard
-      console.log("Forcing navigation to dashboard...");
-      window.location.href = "/dashboard";
+      // Force navigation to dashboard - most direct approach
+      console.log("Forcing navigation to dashboard using direct assignment...");
+      
+      // Try multiple approaches to ensure navigation works
+      try {
+        setTimeout(() => {
+          console.log("Redirecting via location.assign...");
+          window.location.assign("/dashboard");
+        }, 1000);
+        
+        setTimeout(() => {
+          console.log("Redirecting via direct location assignment...");
+          window.location = "/dashboard" as any;
+        }, 2000);
+      } catch (navError) {
+        console.error("Navigation error:", navError);
+        alert("Sign-in successful! Please navigate to the dashboard manually.");
+      }
 
     } catch (error) {
       console.error("Error signing in:", error);
