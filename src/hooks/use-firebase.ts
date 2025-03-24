@@ -56,7 +56,7 @@ export function useFirebaseAuth() {
       } = await import('firebase/firestore');
 
       // Listen for auth state changes
-      const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      const unsubscribe = onAuthStateChanged(auth as import('firebase/auth').Auth, async (authUser) => {
         setLoading(true);
         if (authUser) {
           setUser(authUser);
