@@ -35,7 +35,7 @@ export default function SignInPage() {
       email: "",
       password: "",
     },
-    mode: "onChange", // Enable real-time validation
+    mode: "onChange",
   });
 
   // Check URL parameters and show welcome message
@@ -49,8 +49,12 @@ export default function SignInPage() {
   // Check if Firebase Auth is initialized
   useEffect(() => {
     const checkAuth = () => {
+      console.log("Checking auth initialization...");
       if (auth) {
+        console.log("Auth is initialized");
         setIsAuthInitialized(true);
+      } else {
+        console.log("Auth is not initialized");
       }
     };
     checkAuth();
@@ -67,25 +71,43 @@ export default function SignInPage() {
   }, [form.formState]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("Form submitted with values:", values);
+    console.log("Starting sign in process...");
     if (!isAuthInitialized) {
+      console.error("Auth not initialized");
       toast.error("Authentication is not initialized yet. Please try again.");
       return;
     }
 
+    if (!auth) {
+      console.error("Auth object is null");
+      toast.error("Authentication service is not available. Please try again.");
+      return;
+    }
+
     setIsSubmitting(true);
+    console.log("Attempting to sign in with email...");
+    
     try {
-      await signInWithEmailAndPassword(auth!, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
       
+      console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
       // Redirect after a short delay
+      console.log("Preparing to redirect...");
       setTimeout(() => {
+        console.log("Redirecting to dashboard...");
         window.location.href = "/dashboard";
       }, 1500);
 
     } catch (error) {
       console.error("Error signing in:", error);
+      setIsSubmitting(false);
+      
       if (error instanceof Error) {
         // Handle specific Firebase Auth errors
         const errorMessage = error.message.includes("auth/")
@@ -102,8 +124,6 @@ export default function SignInPage() {
       } else {
         toast.error("Failed to sign in. Please check your credentials.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

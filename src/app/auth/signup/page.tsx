@@ -69,34 +69,54 @@ export default function SignUpPage() {
   }, [form.formState]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("Form submitted with values:", values);
+    console.log("Starting signup process...");
     if (!isAuthInitialized) {
+      console.error("Auth not initialized");
       toast.error("Authentication is not initialized yet. Please try again.");
       return;
     }
 
+    if (!auth) {
+      console.error("Auth object is null");
+      toast.error("Authentication service is not available. Please try again.");
+      return;
+    }
+
     setIsSubmitting(true);
+    console.log("Attempting to create user account...");
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
-        auth!,
+        auth,
         values.email,
         values.password
       );
       
+      console.log("User account created successfully");
+      
       // Update user profile with name
+      console.log("Updating user profile with name...");
       await updateProfile(userCredential.user, {
         displayName: values.name
       });
+      console.log("User profile updated successfully");
 
-      toast.success("Account created successfully!");
+      // Show success message
+      toast.success("Account created successfully!", {
+        duration: 2000,
+      });
       
+      console.log("Preparing to redirect...");
       // Redirect after a short delay
       setTimeout(() => {
+        console.log("Redirecting to sign in page...");
         window.location.href = "/auth/signin?registered=true";
-      }, 1500);
+      }, 2000);
 
     } catch (error) {
       console.error("Error signing up:", error);
+      setIsSubmitting(false);
+      
       if (error instanceof Error) {
         // Handle specific Firebase Auth errors
         const errorMessage = error.message.includes("auth/")
@@ -113,8 +133,6 @@ export default function SignUpPage() {
       } else {
         toast.error("Failed to create account. Please try again.");
       }
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
