@@ -11,9 +11,7 @@ import Link from "next/link";
 import { DashboardCustomize } from "./customize";
 import { FinancialInsights } from "@/components/ai/financial-insights";
 import { useAuth } from '@/providers/firebase-auth-provider';
-
-// Prevent redirect loops
-let redirectAttempted = false;
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,47 +19,63 @@ export default function DashboardPage() {
   const [localUser, setLocalUser] = useState<any>(null);
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   const [isLoading, setIsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Check auth status on mount
   useEffect(() => {
-    // Only run once
-    if (redirectAttempted) return;
+    // Only run the check once
+    if (authChecked) return;
     
-    console.log("Dashboard: Checking auth status", { 
-      firebaseUser: !!user, 
-      firebaseLoading: loading,
-      path: window.location.pathname
-    });
-    
-    // Check for stored user in localStorage
-    let storedUser = null;
-    try {
-      const storedUserData = localStorage.getItem('auth_user');
-      if (storedUserData) {
-        storedUser = JSON.parse(storedUserData);
-        setLocalUser(storedUser);
-        console.log("Dashboard: Using cached user data", storedUser.email);
+    const checkAuth = async () => {
+      console.log("Dashboard: Checking auth status", { 
+        firebaseUser: !!user, 
+        firebaseLoading: loading
+      });
+      
+      // Clear the redirect prevention flag
+      sessionStorage.removeItem('just_signed_in');
+      
+      // Check for stored user in localStorage
+      let storedUser = null;
+      try {
+        const storedUserData = localStorage.getItem('auth_user');
+        if (storedUserData) {
+          storedUser = JSON.parse(storedUserData);
+          setLocalUser(storedUser);
+          console.log("Dashboard: Using cached user data", storedUser.email);
+        }
+      } catch (error) {
+        console.error("Dashboard: Error reading localStorage", error);
       }
-    } catch (error) {
-      console.error("Dashboard: Error reading localStorage", error);
-    }
-    
-    // If we're done loading and no user is found (from Firebase or localStorage)
-    if (!loading && !user && !storedUser) {
-      console.log("Dashboard: No authenticated user found");
-      if (!redirectAttempted) {
-        redirectAttempted = true;
-        console.log("Dashboard: Redirecting to sign-in page");
-        window.location.replace('/auth/signin');
+      
+      // Skip redirects if there's a user or if we're still loading
+      if (user || storedUser || loading) {
+        console.log("Dashboard: User authenticated or still loading");
+        setAuthChecked(true);
+        setIsLoading(false);
+        return;
       }
-    } else {
-      // User is authenticated (either from Firebase or localStorage)
-      setIsLoading(false);
-    }
-  }, [user, loading]);
+      
+      // After a reasonable wait, if no user is found, redirect
+      if (!user && !storedUser && !loading) {
+        console.log("Dashboard: No authenticated user found, redirecting to signin");
+        
+        // Show a message before redirecting
+        toast.error("Authentication required. Please sign in.");
+        
+        // Wait a moment before redirecting to allow the toast to show
+        setTimeout(() => {
+          // Direct navigation to sign-in
+          window.location.href = '/auth/signin';
+        }, 1500);
+      }
+    };
+    
+    checkAuth();
+  }, [user, loading, authChecked]);
 
   // Show loading state while checking auth
-  if (isLoading && loading) {
+  if (isLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -71,8 +85,8 @@ export default function DashboardPage() {
       </div>
     );
   }
-  
-  // If somehow we still don't have a user, show an auth error
+
+  // User is authenticated through Firebase or localStorage
   const activeUser = user || localUser;
   if (!activeUser) {
     return (

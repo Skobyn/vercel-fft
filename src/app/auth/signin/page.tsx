@@ -50,11 +50,20 @@ export default function SignInPage() {
 
   // Redirect if user is already signed in
   useEffect(() => {
-    if (!loading && user) {
-      console.log("User is already signed in, redirecting to dashboard...");
-      router.push("/dashboard");
+    // Check if we're redirecting after successful sign-in (prevent loops)
+    const justSignedIn = sessionStorage.getItem('just_signed_in');
+    if (justSignedIn) {
+      console.log("Just signed in, not redirecting to prevent loops");
+      return;
     }
-  }, [user, loading, router]);
+    
+    // Check for stored user in localStorage
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser && !loading && user) {
+      console.log("User already signed in, redirecting to dashboard");
+      window.location.replace('/dashboard');
+    }
+  }, [user, loading]);
 
   // Check if Firebase Auth is initialized
   useEffect(() => {
@@ -116,6 +125,9 @@ export default function SignInPage() {
       };
       localStorage.setItem('auth_user', JSON.stringify(userData));
       console.log("User data saved to localStorage", userData);
+      
+      // Set a flag to prevent redirect loops
+      sessionStorage.setItem('just_signed_in', 'true');
       
       // Force immediate redirection
       console.log("Manual direct redirect to dashboard...");
