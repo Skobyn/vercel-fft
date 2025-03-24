@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, Auth } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,7 +87,7 @@ export default function SignUpPage() {
 
     try {
       const userCredential = await createUserWithEmailAndPassword(
-        auth,
+        auth as Auth,
         values.email,
         values.password
       );

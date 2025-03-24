@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, Auth } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -119,7 +119,7 @@ export default function SignInPage() {
     console.log("Starting sign in process...");
     setIsSubmitting(true);
     
-    if (!isAuthInitialized) {
+    if (!isAuthInitialized || !auth) {
       console.error("Firebase Auth is not initialized");
       toast.error("Authentication service is not available. Please try again later.");
       setIsSubmitting(false);
@@ -129,7 +129,7 @@ export default function SignInPage() {
     try {
       console.log(`Attempting to sign in with email: ${values.email}`);
       const userCredential = await signInWithEmailAndPassword(
-        auth,
+        auth as Auth,
         values.email,
         values.password
       );
