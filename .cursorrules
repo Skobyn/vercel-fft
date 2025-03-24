@@ -1,0 +1,94 @@
+rule_name: Firebase Authentication
+description: |
+  The app uses Firebase for authentication. The main auth provider is in `src/providers/firebase-auth-provider.tsx`, which contains the `AuthProvider` component and `useAuth` hook. Authentication state is maintained through both Firebase's built-in persistence and localStorage as a backup. Pages that require authentication should check the auth state in a useEffect and redirect if needed.
+
+  Key patterns:
+  - Import `useAuth` from `@/providers/firebase-auth-provider`
+  - Use the `user` and `loading` properties from the hook
+  - For protected pages, implement a redirect check in useEffect
+  - Handle both loading and unauthenticated states explicitly
+
+rule_name: Form Validation
+description: |
+  Forms use react-hook-form with Zod for validation. The standard pattern is:
+  1. Define a schema with Zod
+  2. Create a form with useForm and zodResolver
+  3. Use FormField components from the shadcn/ui library
+  4. Set mode to "onChange" for real-time validation
+
+  Example:
+  ```tsx
+  const formSchema = z.object({
+    email: z.string().email("Please enter a valid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+  });
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    mode: "onChange",
+  });
+  ```
+
+rule_name: Page Structure
+description: |
+  Pages follow a consistent structure:
+  1. Mark as client component with "use client"
+  2. Import necessary hooks and components
+  3. Define the page component
+  4. Add auth check for protected pages
+  5. Handle loading states
+  6. Return the page JSX wrapped in the appropriate layout
+
+  Protected pages should show a loading state while checking auth and redirect unauthenticated users to /auth/signin.
+
+rule_name: Component Organization
+description: |
+  Components are organized as follows:
+  - `src/components/ui`: UI components from shadcn
+  - `src/components/layout`: Layout components like MainLayout
+  - `src/components/forms`: Form-related components
+  - `src/components/charts`: Data visualization components
+  - `src/app/**`: Page components, one per route
+
+  Use the appropriate component categories when creating new components.
+
+rule_name: Import Style
+description: |
+  Imports are organized as follows:
+  1. React and Next.js imports
+  2. External libraries
+  3. Internal components with @ path aliases
+  4. Local imports (relative paths)
+
+  Use path aliases like @/components, @/lib, @/hooks, etc.
+
+rule_name: Error Handling
+description: |
+  Error handling follows these patterns:
+  1. Use try/catch blocks for async operations
+  2. Log errors to console with context
+  3. Display user-friendly error messages with toast notifications
+  4. Format Firebase errors by extracting useful parts of the error message
+  5. Ensure the UI handles error states gracefully
+
+rule_name: Authentication Redirection
+description: |
+  To prevent redirect loops, the current approach uses sessionStorage flags:
+  - `just_signed_in`: Set after successful sign-in to prevent immediate redirects
+  - `redirect_loop_blocker`: Used to detect and break potential redirect loops
+
+  The sign-in page clears these flags, and they're set as needed to manage navigation.
+
+rule_name: State Management
+description: |
+  State management uses React's built-in hooks:
+  - useState for component-local state
+  - useEffect for side effects
+  - useContext for global state (auth, theme)
+  - Custom hooks for encapsulating complex logic
+
+  Avoid prop drilling by using context where appropriate. 
