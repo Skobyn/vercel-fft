@@ -11,7 +11,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
 import { FinancialInsights } from "@/components/ai/financial-insights";
-import { useAuth } from "@/providers/firebase-auth-provider";
+import { useAuth } from '@/providers/firebase-auth-provider';
 
 export default function DashboardPage() {
   const router = useRouter();

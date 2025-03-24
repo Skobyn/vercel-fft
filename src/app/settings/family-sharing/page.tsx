@@ -46,7 +46,7 @@ import {
   UserCog,
   Mail
 } from "lucide-react";
-import { useAuth } from "@/providers/firebase-auth-provider";
+import { useAuth } from '@/providers/firebase-auth-provider';
 
 // Types for family sharing
 type PermissionLevel = "owner" | "admin" | "viewer" | "custom";

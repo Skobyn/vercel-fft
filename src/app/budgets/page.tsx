@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from '@/providers/firebase-auth-provider';
 
 type BudgetCategory = {
   id: number;

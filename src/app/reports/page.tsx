@@ -11,7 +11,7 @@ import { IncomeExpensesChart } from "@/components/reports/income-expenses-chart"
 import { CategoryPieChart } from "@/components/reports/category-pie-chart";
 import { SpendingTrendsChart } from "@/components/reports/spending-trends-chart";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from '@/providers/firebase-auth-provider';
 
 // Mock data for reports
 const incomeData = [
