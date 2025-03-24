@@ -16,6 +16,9 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
+// To prevent redirect loops
+let redirectInProgress = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,18 +57,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(mapFirebaseUser(firebaseUser));
         
         // If on an auth page, redirect to dashboard
-        if (isAuthPage) {
+        if (isAuthPage && !redirectInProgress) {
           console.log("User is authenticated and on auth page, redirecting to dashboard");
-          window.location.href = '/dashboard';
+          redirectInProgress = true;
+          
+          // Store auth info in localStorage
+          localStorage.setItem('auth_user', JSON.stringify({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            timestamp: Date.now(),
+          }));
+          
+          // Redirect to dashboard
+          setTimeout(() => {
+            window.location.replace('/dashboard');
+          }, 100);
         }
       } else {
         console.log("Clearing user state");
         setUser(null);
         
         // If on a protected page, redirect to sign in
-        if (!isAuthPage && (isDashboardPage || window.location.pathname !== '/')) {
+        if (!isAuthPage && isDashboardPage && !redirectInProgress) {
           console.log("User is not authenticated and on protected page, redirecting to sign in");
-          window.location.href = '/auth/signin';
+          redirectInProgress = true;
+          localStorage.removeItem('auth_user'); // Clear auth data
+          
+          setTimeout(() => {
+            window.location.replace('/auth/signin');
+          }, 100);
         }
       }
       

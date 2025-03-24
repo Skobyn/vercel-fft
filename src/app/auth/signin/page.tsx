@@ -105,21 +105,21 @@ export default function SignInPage() {
       );
       
       console.log("Sign in successful:", userCredential.user.email);
+      toast.success("Signed in successfully!");
       
       // Store auth info in localStorage as a more reliable mechanism
-      localStorage.setItem('auth_user', JSON.stringify({
+      const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         timestamp: Date.now(),
-      }));
+      };
+      localStorage.setItem('auth_user', JSON.stringify(userData));
+      console.log("User data saved to localStorage", userData);
       
       // Force immediate redirection
-      console.log("Manual redirect to dashboard...");
-      document.location.href = '/dashboard';
-      
-      // Display toast after redirection is initiated (may not be seen)
-      toast.success("Signed in successfully!");
+      console.log("Manual direct redirect to dashboard...");
+      window.location.replace('/dashboard');
 
     } catch (error) {
       console.error("Error signing in:", error);
