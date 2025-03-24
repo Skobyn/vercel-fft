@@ -213,6 +213,11 @@ export function useFirestoreData<T>(collectionName: string) {
   async function fetchData(queryFn?: (ref: Query<DocumentData>) => Query<DocumentData>) {
     try {
       setLoading(true);
+      // Check if db is null before using it
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+      
       let queryRef = collection(db, collectionName);
       let firestoreQuery = query(queryRef);
       
@@ -238,6 +243,11 @@ export function useFirestoreData<T>(collectionName: string) {
 
   async function getDocument(id: string) {
     try {
+      // Check if db is null before using it
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+      
       const docRef = doc(db, collectionName, id);
       const docSnapshot = await getDoc(docRef);
       
@@ -254,6 +264,11 @@ export function useFirestoreData<T>(collectionName: string) {
 
   async function addDocument(document: Omit<T, 'id'>) {
     try {
+      // Check if db is null before using it
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+      
       // Add created_at and updated_at timestamps
       const docWithTimestamps = {
         ...document,
@@ -275,6 +290,11 @@ export function useFirestoreData<T>(collectionName: string) {
 
   async function updateDocument(id: string, updates: Partial<T>) {
     try {
+      // Check if db is null before using it
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+      
       const docRef = doc(db, collectionName, id);
       
       // Add updated_at timestamp
@@ -297,6 +317,11 @@ export function useFirestoreData<T>(collectionName: string) {
 
   async function deleteDocument(id: string) {
     try {
+      // Check if db is null before using it
+      if (!db) {
+        throw new Error('Firestore is not initialized');
+      }
+      
       const docRef = doc(db, collectionName, id);
       await deleteDoc(docRef);
       
