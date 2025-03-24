@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { z } from "zod";
@@ -32,7 +32,8 @@ const formSchema = z.object({
   }),
 });
 
-export default function SignInPage() {
+// SignIn form component wrapped in suspense
+function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -170,5 +171,25 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Simple loading state component
+function SignInLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-center">
+        <h2 className="text-xl">Loading...</h2>
+      </div>
+    </div>
+  );
+}
+
+// Main page component with Suspense
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<SignInLoading />}>
+      <SignInForm />
+    </Suspense>
   );
 }
