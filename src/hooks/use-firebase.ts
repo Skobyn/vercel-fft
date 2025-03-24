@@ -61,6 +61,13 @@ export function useFirebaseAuth() {
         if (authUser) {
           setUser(authUser);
           try {
+            // Check if db is null before using it
+            if (!db) {
+              console.error('Firestore is not initialized');
+              setLoading(false);
+              return;
+            }
+            
             const userDocRef = doc(db, 'profiles', authUser.uid);
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
