@@ -15,6 +15,7 @@ interface AuthContextType {
 const mapFirebaseUserToUser = (firebaseUser: FirebaseUser): User => {
   return {
     id: firebaseUser.uid,
+    uid: firebaseUser.uid,
     email: firebaseUser.email || '',
     displayName: firebaseUser.displayName || '',
     // Add other properties as needed
