@@ -20,34 +20,91 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   const authCheckRef = useRef(false);
 
-  // Simplified auth check with a ref to prevent multiple checks
+  // Simplified auth check with anti-refresh-loop protection
   useEffect(() => {
     // Skip if we've already checked
     if (authCheckRef.current) return;
     
-    console.log("Dashboard auth check - User:", user ? "authenticated" : "not authenticated", "Loading:", loading);
+    // Don't do anything while still loading
+    if (loading) return;
     
-    if (!loading) {
-      authCheckRef.current = true;
-      
-      if (!user) {
-        // No user even after loading completes - redirect to sign in
-        console.log("No authenticated user found, redirecting to signin");
-        router.push("/auth/signin");
-      } else {
-        // User is authenticated, show dashboard
-        console.log("User is authenticated, showing dashboard");
+    console.log("Dashboard auth check - User:", user ? `authenticated: ${user.email}` : "not authenticated", "Loading:", loading);
+    
+    // Check if we're in a refresh loop
+    const refreshCount = parseInt(sessionStorage.getItem('dashboard_refresh_count') || '0');
+    const lastRefresh = parseInt(sessionStorage.getItem('dashboard_last_refresh') || '0');
+    const now = Date.now();
+    
+    // If we're refreshing too quickly (multiple times within 3 seconds)
+    if (refreshCount > 3 && now - lastRefresh < 3000) {
+      console.warn("Detected potential refresh loop, showing dashboard anyway");
+      sessionStorage.setItem('refresh_loop_detected', 'true');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Update refresh tracking
+    sessionStorage.setItem('dashboard_refresh_count', (refreshCount + 1).toString());
+    sessionStorage.setItem('dashboard_last_refresh', now.toString());
+    
+    // Mark that we've checked auth
+    authCheckRef.current = true;
+    
+    // Check for cached user in localStorage as fallback
+    if (!user) {
+      try {
+        const cachedUser = localStorage.getItem('authUser');
+        if (cachedUser) {
+          console.log("Using cached user from localStorage");
+          setIsLoading(false);
+          return;
+        }
+        
+        // No user found - redirect to signin unless we've detected a refresh loop
+        if (sessionStorage.getItem('refresh_loop_detected') !== 'true') {
+          console.log("No authenticated user found, redirecting to signin");
+          // Clear refresh tracking before redirecting
+          sessionStorage.removeItem('dashboard_refresh_count');
+          sessionStorage.removeItem('dashboard_last_refresh');
+          router.push("/auth/signin");
+        } else {
+          console.log("Refresh loop detected, showing dashboard without user");
+          setIsLoading(false);
+        }
+      } catch (e) {
+        console.error("Error checking localStorage:", e);
         setIsLoading(false);
       }
+    } else {
+      // User is authenticated, show dashboard
+      console.log("User is authenticated, showing dashboard");
+      setIsLoading(false);
     }
   }, [user, loading, router]);
 
-  // Once auth check is complete and user is verified, stop showing loading state
+  // Clear refresh loop detection when component is mounted
   useEffect(() => {
-    if (!loading && user) {
-      setIsLoading(false);
+    // Reset refresh detection if it's been more than 10 seconds since last visit
+    const lastVisit = parseInt(sessionStorage.getItem('dashboard_last_visit') || '0');
+    const now = Date.now();
+    
+    if (now - lastVisit > 10000) {
+      sessionStorage.removeItem('refresh_loop_detected');
+      sessionStorage.removeItem('dashboard_refresh_count');
     }
-  }, [loading, user]);
+    
+    sessionStorage.setItem('dashboard_last_visit', now.toString());
+    
+    return () => {
+      // If we've successfully stayed on the dashboard for 5 seconds, clear the refresh detection
+      const timeoutId = setTimeout(() => {
+        sessionStorage.removeItem('refresh_loop_detected');
+        sessionStorage.removeItem('dashboard_refresh_count');
+      }, 5000);
+      
+      return () => clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -61,8 +118,8 @@ export default function DashboardPage() {
     );
   }
 
-  // User should be authenticated if we got this far
-  if (!user) {
+  // User should be authenticated if we got this far, but handle the case when they aren't
+  if (!user && sessionStorage.getItem('refresh_loop_detected') !== 'true') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center p-6 max-w-md">

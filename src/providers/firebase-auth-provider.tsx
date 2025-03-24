@@ -27,6 +27,42 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
+// Safe localStorage helper functions
+const safeGetItem = (key: string): string | null => {
+  try {
+    return typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+  } catch (e) {
+    console.error(`Error reading ${key} from localStorage:`, e);
+    return null;
+  }
+};
+
+const safeSetItem = (key: string, value: string): boolean => {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(key, value);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error(`Error writing ${key} to localStorage:`, e);
+    return false;
+  }
+};
+
+const safeRemoveItem = (key: string): boolean => {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(key);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error(`Error removing ${key} from localStorage:`, e);
+    return false;
+  }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,14 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("Auth provider initializing");
     
     // Try to restore user from localStorage first for faster initial state
-    const savedUser = localStorage.getItem("authUser");
+    const savedUser = safeGetItem("authUser");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
         console.log("User restored from localStorage");
       } catch (error) {
         console.error("Failed to parse saved user:", error);
-        localStorage.removeItem("authUser");
+        safeRemoveItem("authUser");
       }
     }
     
@@ -67,14 +103,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const mappedUser = mapFirebaseUserToUser(authUser);
             setUser(mappedUser);
-            localStorage.setItem("authUser", JSON.stringify(mappedUser));
+            safeSetItem("authUser", JSON.stringify(mappedUser));
             console.log("User set from Firebase auth:", mappedUser.email);
+            
+            // Check if we need to redirect after authentication
+            if (typeof window !== 'undefined' && 
+                window.location.pathname.includes('/auth/signin') && 
+                sessionStorage.getItem('just_authenticated') === 'true') {
+              console.log("Redirecting after fresh authentication");
+              sessionStorage.removeItem('just_authenticated');
+              window.location.href = "/dashboard";
+            }
           } catch (error) {
             console.error("Error mapping user:", error);
           }
         } else {
           setUser(null);
-          localStorage.removeItem("authUser");
+          safeRemoveItem("authUser");
           console.log("User cleared from state and localStorage");
         }
         

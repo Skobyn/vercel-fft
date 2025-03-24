@@ -49,6 +49,16 @@ export default function SignInPage() {
     }
   }, []);
 
+  // Clear refresh loop detection on signin page
+  useEffect(() => {
+    // Clear refresh loop detection when the user intentionally visits the signin page
+    sessionStorage.removeItem('refresh_loop_detected');
+    sessionStorage.removeItem('dashboard_refresh_count');
+    
+    // Mark this page as just visited to prevent immediate redirects
+    sessionStorage.setItem('signin_page_visited', Date.now().toString());
+  }, []);
+
   // Handle redirect if already authenticated
   useEffect(() => {
     // Skip if we've already checked or still loading
@@ -57,20 +67,17 @@ export default function SignInPage() {
     // Mark that we've checked auth state
     authCheckRef.current = true;
     
-    console.log("Signin page auth check - User:", user ? "authenticated" : "not authenticated");
+    console.log("Signin page auth check - User:", user ? `authenticated: ${user.email}` : "not authenticated");
     
     // If we have a user, redirect to dashboard
     if (user) {
       console.log("User already authenticated, redirecting to dashboard");
-      router.push("/dashboard");
       
-      // Fallback redirection
-      setTimeout(() => {
-        if (window.location.pathname.includes("/auth/signin")) {
-          console.log("Fallback navigation to dashboard");
-          window.location.href = "/dashboard";
-        }
-      }, 1000);
+      // Set a flag to indicate intentional navigation from sign-in to dashboard
+      sessionStorage.setItem('auth_redirect_from_signin', 'true');
+      
+      // Use the router for client-side navigation
+      router.push("/dashboard");
     }
   }, [user, loading, router]);
 
@@ -116,24 +123,24 @@ export default function SignInPage() {
         displayName: userCredential.user.displayName,
       });
       
+      // Set a flag to indicate successful authentication
+      sessionStorage.setItem('just_authenticated', 'true');
+      sessionStorage.setItem('auth_redirect_from_signin', 'true');
+      
+      // Clear any potential refresh loop detection
+      sessionStorage.removeItem('refresh_loop_detected');
+      sessionStorage.removeItem('dashboard_refresh_count');
+      
       // Use multiple redirection methods to ensure it works
       try {
         // Method 1: Next.js router
         router.push("/dashboard");
         
-        // Method 2: Direct navigation with a delay to allow firebase auth to update
+        // Method 2: Direct navigation after a delay to allow Firebase auth to update
         setTimeout(() => {
           console.log("Executing fallback navigation to dashboard");
           window.location.href = "/dashboard";
         }, 500);
-        
-        // Method 3: Extra fallback in case the above methods don't work
-        setTimeout(() => {
-          if (window.location.pathname.includes("/auth/signin")) {
-            console.log("Executing emergency fallback navigation");
-            window.location.replace("/dashboard");
-          }
-        }, 2000);
       } catch (navError) {
         console.error("Navigation error:", navError);
         // If router.push fails, use direct navigation
