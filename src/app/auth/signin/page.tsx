@@ -50,6 +50,9 @@ export default function SignInPage() {
 
   // Redirect if user is already signed in
   useEffect(() => {
+    // Clear the redirect loop blocker flag
+    sessionStorage.removeItem('redirect_loop_blocker');
+    
     // Check if we're redirecting after successful sign-in (prevent loops)
     const justSignedIn = sessionStorage.getItem('just_signed_in');
     if (justSignedIn) {

@@ -26,13 +26,22 @@ export default function DashboardPage() {
     // Only run the check once
     if (authChecked) return;
     
+    // Set a flag in sessionStorage to break the redirect loop
+    const isInRedirectLoop = sessionStorage.getItem('redirect_loop_blocker');
+    if (isInRedirectLoop) {
+      console.log("Potential redirect loop detected, showing auth UI instead of redirecting");
+      setAuthChecked(true);
+      setIsLoading(false);
+      return;
+    }
+    
     const checkAuth = async () => {
       console.log("Dashboard: Checking auth status", { 
         firebaseUser: !!user, 
         firebaseLoading: loading
       });
       
-      // Clear the redirect prevention flag
+      // Clear the sign-in flag
       sessionStorage.removeItem('just_signed_in');
       
       // Check for stored user in localStorage
@@ -60,14 +69,11 @@ export default function DashboardPage() {
       if (!user && !storedUser && !loading) {
         console.log("Dashboard: No authenticated user found, redirecting to signin");
         
-        // Show a message before redirecting
-        toast.error("Authentication required. Please sign in.");
+        // Set a flag to detect redirect loops
+        sessionStorage.setItem('redirect_loop_blocker', 'true');
         
-        // Wait a moment before redirecting to allow the toast to show
-        setTimeout(() => {
-          // Direct navigation to sign-in
-          window.location.href = '/auth/signin';
-        }, 1500);
+        // Navigate directly without a delay
+        window.location.href = '/auth/signin';
       }
     };
     
