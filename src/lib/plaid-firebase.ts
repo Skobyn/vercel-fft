@@ -16,6 +16,11 @@ export async function storePlaidToken(
   institutionName?: string
 ): Promise<void> {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     const plaidItemRef = doc(db, 'plaid_items', itemId);
     
     await setDoc(plaidItemRef, {
@@ -43,6 +48,11 @@ export async function storePlaidToken(
  */
 export async function getPlaidToken(itemId: string): Promise<string | null> {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     const plaidItemRef = doc(db, 'plaid_items', itemId);
     const docSnap = await getDoc(plaidItemRef);
     
@@ -65,6 +75,11 @@ export async function getPlaidToken(itemId: string): Promise<string | null> {
  */
 export async function getUserPlaidItems(userId: string) {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     const plaidItemsQuery = query(
       collection(db, 'plaid_items'),
       where('user_id', '==', userId)
@@ -96,6 +111,11 @@ export async function storePlaidAccounts(
   accounts: any[]
 ) {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     // Process each account
     for (const account of accounts) {
       // Generate a Firebase-friendly ID
@@ -165,6 +185,11 @@ export async function storePlaidTransactions(
   transactions: any[]
 ) {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     for (const transaction of transactions) {
       // Generate a Firebase-friendly ID
       const transactionId = `plaid-${transaction.transaction_id}`;
