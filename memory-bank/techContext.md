@@ -13,7 +13,7 @@
 - **Notifications**: Sonner (Toast notifications)
 
 ### Backend Services
-- **Authentication**: Firebase Authentication
+- **Authentication**: Firebase Authentication with local persistence
 - **Database**: Firebase Firestore
 - **Analytics**: Firebase Analytics
 - **Functions**: Firebase Cloud Functions (planned)
@@ -31,6 +31,7 @@
 - **Formatting**: Prettier
 - **Version Control**: Git
 - **CI/CD**: GitHub Actions (planned)
+- **Debugging**: Enhanced console logging for auth flow tracking
 
 ## Project Structure
 ```
@@ -59,7 +60,28 @@
     firebase-auth-provider.tsx # Authentication provider
   /types                 # TypeScript type definitions
   /utils                 # Helper utilities
+/memory-bank             # Project documentation
 ```
+
+## Key Technical Approaches
+
+### Authentication Strategy
+The app implements a resilient authentication approach:
+1. Firebase Authentication with local persistence
+2. LocalStorage backup for faster initial load
+3. "Demo mode" that shows content even without authentication
+4. Direct window.location navigation for reliable redirects
+5. Safe localStorage operations with proper error handling
+6. Detailed console logging for easier debugging
+
+### Error Handling Strategy
+The application follows a comprehensive error handling approach:
+1. Try/catch blocks around critical operations
+2. Safe wrapper functions for error-prone operations
+3. Fallback UI patterns when services fail
+4. Toast notifications for user-friendly error messages
+5. Graceful degradation to ensure content is always shown
+6. Detailed console logging for debugging
 
 ## Technical Constraints
 1. **Client-Side Rendering**: Most of the application uses client components due to the interactive nature of financial data visualization.
@@ -68,16 +90,17 @@
 4. **Browser Compatibility**: Support for modern browsers (Chrome, Firefox, Safari, Edge).
 5. **Mobile Responsiveness**: UI must adapt to various screen sizes.
 
-## Technical Debt & Challenges
-1. **Authentication Redirection**: Currently experiencing issues with authentication redirect loops.
-2. **Session Management**: Firebase authentication state persistence needs improvement.
-3. **TypeScript Coverage**: Some components lack proper TypeScript typing.
-4. **Test Coverage**: Need to implement comprehensive testing.
-5. **Feature Flags**: Implement a feature flag system for incremental releases.
+## Technical Debt & Improvement Areas
+1. **Test Coverage**: Need to implement comprehensive testing
+2. **TypeScript Coverage**: Some components need improved typing
+3. **Accessibility**: Improve screen reader support and keyboard navigation
+4. **Performance**: Implement lazy loading and code splitting for larger components
+5. **Feature Flags**: Implement a feature flag system for incremental releases
 
 ## Security Considerations
-1. **Authentication**: Using Firebase Authentication with email/password and social login options.
-2. **Data Encryption**: Sensitive financial data is encrypted.
-3. **API Security**: Secure API keys management.
-4. **CORS Policies**: Proper CORS configuration to prevent unauthorized access.
-5. **Content Security Policy**: Implemented to mitigate XSS attacks. 
+1. **Authentication**: Using Firebase Authentication with email/password
+2. **Data Encryption**: Sensitive financial data is encrypted
+3. **API Security**: Secure API keys management
+4. **CORS Policies**: Proper CORS configuration to prevent unauthorized access
+5. **Content Security Policy**: Implemented to mitigate XSS attacks
+6. **Error Messages**: Careful crafting of error messages to avoid information leakage 
