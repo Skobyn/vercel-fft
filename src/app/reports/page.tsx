@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, PieChart, BarChart3, LineChart as LineChartIcon, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IncomeExpensesChart } from "@/components/reports/income-expenses-chart";
 import { CategoryPieChart } from "@/components/reports/category-pie-chart";
 import { SpendingTrendsChart } from "@/components/reports/spending-trends-chart";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 // Mock data for reports
 const incomeData = [
@@ -51,8 +53,30 @@ const monthlyBalanceData = [
 ];
 
 export default function ReportsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<string>("6m");
   const [selectedYear, setSelectedYear] = useState<string>("2025");
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const getCategoryColor = (categoryName: string): string => {
     const colorMap: Record<string, string> = {

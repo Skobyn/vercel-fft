@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SubscriptionManager } from "@/components/subscriptions/subscription-manager";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 type Bill = {
   id: number;
@@ -39,6 +42,8 @@ type Bill = {
 };
 
 export default function BillsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [openNewBillDialog, setOpenNewBillDialog] = useState(false);
   const [billName, setBillName] = useState("");
   const [billAmount, setBillAmount] = useState("");
@@ -50,6 +55,20 @@ export default function BillsPage() {
   const [billReminders, setBillReminders] = useState<number[]>([7, 3, 1]); // Days before
   const [searchText, setSearchText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   // Sample bills data
   const bills: Bill[] = [

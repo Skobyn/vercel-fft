@@ -20,9 +20,10 @@ import {
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  User
+  User as FirebaseUser
 } from 'firebase/auth';
 import { db as firebaseDb, auth } from '@/lib/firebase-client';
+import { User, mapFirebaseUser } from '@/types/user';
 
 // Explicitly type the db variable
 const db: Firestore | null = firebaseDb;
@@ -59,7 +60,7 @@ export function useFirebaseAuth() {
       const unsubscribe = onAuthStateChanged(auth as import('firebase/auth').Auth, async (authUser) => {
         setLoading(true);
         if (authUser) {
-          setUser(authUser);
+          setUser(mapFirebaseUser(authUser));
           try {
             // Check if db is null before using it
             if (!db) {

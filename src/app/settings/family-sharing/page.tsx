@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
   UserCog,
   Mail
 } from "lucide-react";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 // Types for family sharing
 type PermissionLevel = "owner" | "admin" | "viewer" | "custom";
@@ -68,11 +70,13 @@ interface FamilyMember {
 }
 
 export default function FamilySharingPage() {
-  const [openInviteDialog, setOpenInviteDialog] = useState(false);
-  const [openPermissionsDialog, setOpenPermissionsDialog] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePermissionLevel, setInvitePermissionLevel] = useState<PermissionLevel>("viewer");
+  const [openPermissionsDialog, setOpenPermissionsDialog] = useState(false);
   const [customPermissions, setCustomPermissions] = useState<Record<PermissionArea, { view: boolean, edit: boolean }>>({
     transactions: { view: true, edit: false },
     budgets: { view: true, edit: false },
@@ -82,6 +86,20 @@ export default function FamilySharingPage() {
     settings: { view: false, edit: false },
     bankAccounts: { view: true, edit: false }
   });
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   // Sample family members
   const familyMembers: FamilyMember[] = [
@@ -232,17 +250,13 @@ export default function FamilySharingPage() {
     // Reset form
     setInviteEmail("");
     setInvitePermissionLevel("viewer");
-    setOpenInviteDialog(false);
+    setShowInviteDialog(false);
   };
 
   const handleSelectMember = (memberId: string) => {
-    setSelectedMemberId(memberId);
+    setSelectedMember(familyMembers.find(member => member.id === memberId) || null);
     setOpenPermissionsDialog(true);
   };
-
-  const selectedMember = selectedMemberId
-    ? familyMembers.find(member => member.id === selectedMemberId)
-    : null;
 
   return (
     <MainLayout>
@@ -254,7 +268,7 @@ export default function FamilySharingPage() {
               Manage access to your financial information with family members
             </p>
           </div>
-          <Dialog open={openInviteDialog} onOpenChange={setOpenInviteDialog}>
+          <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
             <DialogTrigger asChild>
               <Button>
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -337,7 +351,7 @@ export default function FamilySharingPage() {
                 )}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setOpenInviteDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
                 <Button onClick={handleInvite}>Send Invitation</Button>
               </DialogFooter>
             </DialogContent>

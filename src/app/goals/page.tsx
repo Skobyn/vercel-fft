@@ -17,11 +17,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Search, Plus, Edit, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 type Goal = {
   id: number;
@@ -37,6 +39,8 @@ type Goal = {
 };
 
 export default function GoalsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [openNewGoalDialog, setOpenNewGoalDialog] = useState(false);
   const [goalName, setGoalName] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
@@ -199,6 +203,26 @@ export default function GoalsPage() {
     // Close dialog
     setOpenNewGoalDialog(false);
   };
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <MainLayout>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -16,43 +16,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/providers/firebase-auth-provider";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Define the form validation schema
 const formSchema = z.object({
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
-  password: z.string().min(1, {
-    message: "Password is required.",
-  }),
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
-// SignIn form component wrapped in suspense
-function SignInForm() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+export default function SignInPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  
-  // Only access useAuth hook after component is mounted
-  // This prevents SSR issues with Firebase initialization
-  const auth = isMounted ? useAuth() : { signIn: async () => { throw new Error('Auth not initialized') } };
 
-  // Set isMounted to true after component mounts
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Check if user just registered
-  const registered = searchParams.get("registered") === "true";
-
-  // Initialize the form with React Hook Form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -61,135 +34,63 @@ function SignInForm() {
     },
   });
 
-  // Handle form submission
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      if (!isMounted) {
-        throw new Error("Application is still initializing. Please try again.");
+      if (!auth) {
+        throw new Error("Authentication is not initialized");
       }
-      
-      // Sign in the user with Firebase
-      await auth.signIn(values.email, values.password);
-      
+      await signInWithEmailAndPassword(auth, values.email, values.password);
       toast.success("Signed in successfully!");
       router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Signin error:", error);
-      setError(error.message || "Failed to sign in");
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Error signing in:", error);
+      toast.error("Failed to sign in. Please check your credentials.");
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md space-y-6">
+    <div className="container mx-auto max-w-md py-12">
+      <div className="space-y-6">
         <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold">Welcome Back</h1>
-          <p className="text-muted-foreground">
-            Sign in to your account to continue
+          <h1 className="text-3xl font-bold">Sign In</h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            Enter your credentials to access your account
           </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>
-              Enter your email and password to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {registered && (
-              <Alert className="mb-4 bg-green-50 text-green-800 border-green-100">
-                <AlertCircle className="h-4 w-4 text-green-800" />
-                <AlertTitle>Success!</AlertTitle>
-                <AlertDescription>
-                  Your account has been created. Please sign in.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {error && (
-              <Alert className="mb-4 bg-destructive/10 text-destructive border-destructive/20">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Authentication Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="john.doe@example.com" type="email" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input placeholder="********" type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={isLoading || !isMounted}>
-                  {isLoading ? "Signing in..." : "Sign In"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <div className="text-center text-sm">
-              <Link href="/auth/reset-password" className="text-sm text-primary hover:underline">
-                Forgot your password?
-              </Link>
-            </div>
-          </CardFooter>
-        </Card>
-
-        <div className="text-center text-sm">
-          Don't have an account?{" "}
-          <Link href="/auth/signup" className="font-medium text-primary underline">
-            Sign up
-          </Link>
-        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="you@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full">
+              Sign In
+            </Button>
+          </form>
+        </Form>
       </div>
     </div>
-  );
-}
-
-// Simple loading state component
-function SignInLoading() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h2 className="text-xl">Loading...</h2>
-      </div>
-    </div>
-  );
-}
-
-// Main page component with Suspense
-export default function SignInPage() {
-  return (
-    <Suspense fallback={<SignInLoading />}>
-      <SignInForm />
-    </Suspense>
   );
 }

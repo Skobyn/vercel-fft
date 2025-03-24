@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { PlaidLinkButton } from "./plaid-link-button"; // Added import
+import { PlaidLinkButton } from "./plaid-link-button";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 // Mock connected accounts for UI demonstration
 type ConnectedAccount = {
@@ -24,8 +27,24 @@ type ConnectedAccount = {
 };
 
 export default function ConnectBankPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   // Mock data for connected accounts
   const connectedAccounts: ConnectedAccount[] = [

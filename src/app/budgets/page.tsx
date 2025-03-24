@@ -17,10 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Search, Plus, Edit, AlertTriangle, PieChart, BarChart } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 type BudgetCategory = {
   id: number;
@@ -32,6 +34,8 @@ type BudgetCategory = {
 };
 
 export default function BudgetsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [openNewBudgetDialog, setOpenNewBudgetDialog] = useState(false);
   const [budgetName, setBudgetName] = useState("");
   const [budgetAmount, setBudgetAmount] = useState("");
@@ -158,6 +162,26 @@ export default function BudgetsPage() {
     if (percentSpent < 100) return "bg-amber-500";
     return "bg-red-500";
   };
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <MainLayout>

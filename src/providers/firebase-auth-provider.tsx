@@ -1,61 +1,53 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useEffect } from 'react';
-import { useFirebaseAuth } from '@/hooks/use-firebase';
-import { User } from 'firebase/auth';
-import { initializeUserData } from '@/utils/initializeDefaultData';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { auth } from '@/lib/firebase-client';
+import { User as FirebaseUser } from 'firebase/auth';
+import { User, mapFirebaseUser } from '@/types/user';
 
-interface FirebaseAuthContextType {
+interface AuthContextType {
   user: User | null;
-  userProfile: any;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<User>;
-  signUp: (email: string, password: string, userData: any) => Promise<User>;
-  signOut: () => Promise<void>;
-  updateProfile: (userId: string, profileData: any) => Promise<void>;
-  initializeNewUser: (userId: string, householdName?: string) => Promise<void>;
 }
 
-const FirebaseAuthContext = createContext<FirebaseAuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+});
 
-export function FirebaseAuthProvider({ children }: { children: ReactNode }) {
-  const auth = useFirebaseAuth();
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  // Function to initialize a new user with default data
-  const initializeNewUser = async (userId: string, householdName?: string) => {
-    // Ensure this function doesn't fail when running on the server
-    if (typeof window === 'undefined') {
-      console.warn('initializeNewUser called on the server - deferring to client');
+  useEffect(() => {
+    if (typeof window === 'undefined' || !auth) {
+      setLoading(false);
       return;
     }
-    
-    try {
-      await initializeUserData(userId, householdName);
-    } catch (error) {
-      console.error('Error initializing user data:', error);
-    }
-  };
 
-  // Enhanced sign up function that also initializes user data
-  const enhancedSignUp = async (email: string, password: string, userData: any) => {
-    const user = await auth.signUp(email, password, userData);
-    await initializeNewUser(user.uid, userData.householdName);
-    return user;
-  };
+    return auth.onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser) {
+        setUser(mapFirebaseUser(firebaseUser));
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+  }, []);
 
-  const enhancedAuth = {
-    ...auth,
-    signUp: enhancedSignUp,
-    initializeNewUser
-  };
-
-  return <FirebaseAuthContext.Provider value={enhancedAuth}>{children}</FirebaseAuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth() {
-  const context = useContext(FirebaseAuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within a FirebaseAuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}; 

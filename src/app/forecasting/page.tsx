@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ForecastChart } from "@/components/reports/forecast-chart";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 // Types for our forecast data
 type ExpectedIncome = {
@@ -77,6 +80,23 @@ type MonthlyForecast = {
 };
 
 export default function ForecastingPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
   const [forecastPeriod, setForecastPeriod] = useState<string>("3m");
   const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState<boolean>(true);
   const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);

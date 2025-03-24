@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +11,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
 import { FinancialInsights } from "@/components/ai/financial-insights";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   // Mock data - in a real app, this would come from an API
   const summaryData = {
