@@ -150,6 +150,17 @@ export default function SignInPage() {
             >
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
+            <div className="text-center mt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Don't have an account?{" "}
+                <a
+                  href="/auth/signup"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Sign up
+                </a>
+              </p>
+            </div>
           </form>
         </Form>
       </div>
