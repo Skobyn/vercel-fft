@@ -88,8 +88,18 @@ export default function SignUpPage() {
         displayName: values.name
       });
 
-      toast.success("Account created successfully!");
-      router.push("/auth/signin?registered=true");
+      // Show success message and wait for it to be visible
+      await new Promise(resolve => {
+        toast.success("Account created successfully!", {
+          onAutoClose: resolve,
+          duration: 2000
+        });
+      });
+
+      // Wait a moment for the toast to be visible before redirecting
+      setTimeout(() => {
+        window.location.href = "/auth/signin?registered=true";
+      }, 500);
     } catch (error) {
       console.error("Error signing up:", error);
       if (error instanceof Error) {
@@ -108,7 +118,6 @@ export default function SignUpPage() {
       } else {
         toast.error("Failed to create account. Please try again.");
       }
-    } finally {
       setIsSubmitting(false);
     }
   }

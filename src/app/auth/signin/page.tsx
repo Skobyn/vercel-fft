@@ -38,6 +38,14 @@ export default function SignInPage() {
     mode: "onChange", // Enable real-time validation
   });
 
+  // Check URL parameters and show welcome message
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('registered') === 'true') {
+      toast.success("Account created! Please sign in with your credentials.");
+    }
+  }, []);
+
   // Check if Firebase Auth is initialized
   useEffect(() => {
     const checkAuth = () => {
@@ -68,8 +76,19 @@ export default function SignInPage() {
     setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth!, values.email, values.password);
-      toast.success("Signed in successfully!");
-      router.push("/dashboard");
+      
+      // Show success message and wait for it to be visible
+      await new Promise(resolve => {
+        toast.success("Signed in successfully!", {
+          onAutoClose: resolve,
+          duration: 2000
+        });
+      });
+
+      // Wait a moment for the toast to be visible before redirecting
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 500);
     } catch (error) {
       console.error("Error signing in:", error);
       if (error instanceof Error) {
@@ -88,7 +107,6 @@ export default function SignInPage() {
       } else {
         toast.error("Failed to sign in. Please check your credentials.");
       }
-    } finally {
       setIsSubmitting(false);
     }
   }
