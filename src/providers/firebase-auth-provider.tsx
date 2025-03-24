@@ -21,8 +21,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Handle auth state and redirects
   useEffect(() => {
     console.log("Initializing auth provider...");
+    
+    // Check if we're on an auth page
+    const isAuthPage = window.location.pathname.startsWith('/auth');
+    const isDashboardPage = window.location.pathname.startsWith('/dashboard');
+    
+    console.log("Current page:", {
+      path: window.location.pathname,
+      isAuthPage,
+      isDashboardPage
+    });
+    
     if (typeof window === 'undefined' || !auth) {
       console.log("Auth provider: No window or auth object");
       setLoading(false);
@@ -40,9 +52,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           displayName: firebaseUser.displayName,
         });
         setUser(mapFirebaseUser(firebaseUser));
+        
+        // If on an auth page, redirect to dashboard
+        if (isAuthPage) {
+          console.log("User is authenticated and on auth page, redirecting to dashboard");
+          window.location.href = '/dashboard';
+        }
       } else {
         console.log("Clearing user state");
         setUser(null);
+        
+        // If on a protected page, redirect to sign in
+        if (!isAuthPage && (isDashboardPage || window.location.pathname !== '/')) {
+          console.log("User is not authenticated and on protected page, redirecting to sign in");
+          window.location.href = '/auth/signin';
+        }
       }
       
       setLoading(false);

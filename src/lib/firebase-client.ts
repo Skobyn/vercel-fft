@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAuth, Auth, User } from 'firebase/auth';
+import { getAuth, Auth, User, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 
 // Only initialize Firebase in the browser environment
@@ -27,6 +27,17 @@ if (typeof window !== 'undefined') {
   app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   db = getFirestore(app);
   auth = getAuth(app);
+
+  // Set authentication persistence to local (survives browser restarts)
+  if (auth) {
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log('Firebase persistence set to browserLocalPersistence');
+      })
+      .catch((error) => {
+        console.error('Error setting persistence:', error);
+      });
+  }
 
   // Initialize Analytics - only in browser
   isSupported().then(supported => {

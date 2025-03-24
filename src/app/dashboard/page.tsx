@@ -18,17 +18,39 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
 
+  // Check auth status and redirect if needed
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/signin");
+    // Check for stored user in localStorage as a fallback
+    const storedUser = localStorage.getItem('auth_user');
+    const hasStoredUser = !!storedUser;
+    
+    console.log("Dashboard page - Auth state:", { 
+      user: !!user, 
+      loading, 
+      hasStoredUser,
+      pathname: window.location.pathname
+    });
+
+    if (!loading && !user && !hasStoredUser) {
+      console.log("Dashboard page - No authenticated user, redirecting to signin");
+      window.location.href = "/auth/signin";
     }
   }, [loading, user, router]);
 
+  // Show loading state while checking auth
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (!user) {
+  // No user after loading is complete
+  if (!user && !localStorage.getItem('auth_user')) {
     return null;
   }
 
