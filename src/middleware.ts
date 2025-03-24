@@ -1,59 +1,35 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
-// This function can be marked `async` if using `await` inside
+// Middleware to handle auth redirects
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // Get the pathname of the request
+  const path = request.nextUrl.pathname;
 
-  // Check if this is a protected route
-  const protectedRoutes = [
-    '/dashboard',
-    '/transactions',
-    '/budgets',
-    '/bills',
-    '/goals',
-    '/reports',
-    '/profile',
-    '/settings',
-    '/connect-bank',
-  ];
+  // Define public paths that don't require authentication
+  const isPublicPath = path.startsWith('/auth/') || 
+                      path === '/' || 
+                      path.startsWith('/api/');
 
-  const matchesProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
+  // Get the token from the session cookie
+  const token = request.cookies.get('session')?.value;
 
-  // Public routes (no auth required)
-  if (!matchesProtectedRoute) {
-    return NextResponse.next();
+  // Redirect unauthenticated users to signin page
+  if (!token && !isPublicPath) {
+    return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
 
-  // Check if the user is authenticated
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET || "demo-secret-key-change-in-production",
-  });
-
-  // If the user is not authenticated and trying to access a protected route,
-  // redirect to the login page
-  if (!token && matchesProtectedRoute) {
-    const url = new URL('/auth/signin', request.url);
-    url.searchParams.set('callbackUrl', encodeURI(pathname));
-    return NextResponse.redirect(url);
+  // Redirect authenticated users away from auth pages
+  if (token && path.startsWith('/auth/')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // If the user is authenticated, allow access to protected routes
   return NextResponse.next();
 }
 
-// See "Matching Paths" below to learn more
+// Configure paths that should be protected
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public directory
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };
