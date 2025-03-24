@@ -9,6 +9,11 @@ import { collection, addDoc, Timestamp } from 'firebase/firestore';
  */
 export async function createHouseholdForUser(userId: string, name: string = 'My Household'): Promise<string> {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     // Create the household
     const householdRef = await addDoc(collection(db, 'households'), {
       name,
@@ -38,6 +43,11 @@ export async function createHouseholdForUser(userId: string, name: string = 'My 
  */
 export async function createDefaultCategories(householdId: string): Promise<void> {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     const incomeCategories = [
       { name: 'Salary', type: 'income', color: '#4CAF50', icon: 'briefcase' },
       { name: 'Bonus', type: 'income', color: '#8BC34A', icon: 'gift' },
@@ -99,6 +109,11 @@ export async function createDefaultCategories(householdId: string): Promise<void
  */
 export async function createDefaultAccounts(householdId: string): Promise<void> {
   try {
+    // Check if db is null before using it
+    if (!db) {
+      throw new Error('Firestore is not initialized');
+    }
+    
     const defaultAccounts = [
       { 
         name: 'Checking Account', 
