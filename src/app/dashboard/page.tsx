@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CircleDollarSign, ArrowUp, ArrowDown, CreditCard, AlertCircle, Plus, PiggyBank } from "lucide-react";
-import { useState } from "react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
 import { FinancialInsights } from "@/components/ai/financial-insights";
@@ -16,29 +15,41 @@ import { useAuth } from '@/providers/firebase-auth-provider';
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [localUser, setLocalUser] = useState<any>(null);
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check auth status and redirect if needed
+  // Check both Firebase auth and localStorage for user data
   useEffect(() => {
-    // Check for stored user in localStorage as a fallback
-    const storedUser = localStorage.getItem('auth_user');
-    const hasStoredUser = !!storedUser;
+    const checkAuth = () => {
+      // Check for stored user in localStorage
+      try {
+        const storedUserData = localStorage.getItem('auth_user');
+        console.log("Local storage auth data:", storedUserData ? "Present" : "Not found");
+        
+        if (storedUserData) {
+          const parsedUser = JSON.parse(storedUserData);
+          setLocalUser(parsedUser);
+          console.log("Using local storage user data:", parsedUser.email);
+        }
+      } catch (error) {
+        console.error("Error checking local storage:", error);
+      }
+      
+      setIsLoading(false);
+    };
     
-    console.log("Dashboard page - Auth state:", { 
-      user: !!user, 
-      loading, 
-      hasStoredUser,
-      pathname: window.location.pathname
-    });
-
-    if (!loading && !user && !hasStoredUser) {
-      console.log("Dashboard page - No authenticated user, redirecting to signin");
-      window.location.href = "/auth/signin";
+    // Only check localStorage if Firebase auth is still loading or failed
+    if (!loading && user) {
+      console.log("Firebase auth user found, no need to check localStorage");
+      setIsLoading(false);
+    } else {
+      checkAuth();
     }
-  }, [loading, user, router]);
+  }, [loading, user]);
 
   // Show loading state while checking auth
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -49,10 +60,18 @@ export default function DashboardPage() {
     );
   }
 
-  // No user after loading is complete
-  if (!user && !localStorage.getItem('auth_user')) {
+  // If no user from either Firebase or localStorage, redirect to sign-in
+  const hasUser = !!user || !!localUser;
+  if (!hasUser) {
+    console.log("No authenticated user found, redirecting to signin");
+    if (typeof window !== 'undefined') {
+      window.location.href = "/auth/signin";
+    }
     return null;
   }
+
+  // User is authenticated (either from Firebase or localStorage)
+  console.log("User authenticated, displaying dashboard");
 
   // Mock data - in a real app, this would come from an API
   const summaryData = {
