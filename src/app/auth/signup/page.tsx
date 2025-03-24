@@ -102,21 +102,13 @@ export default function SignUpPage() {
       console.log("User profile updated successfully");
 
       // Show success message
-      toast.success("Account created successfully!", {
-        duration: 2000,
-      });
+      toast.success("Account created successfully!");
       
       console.log("Preparing to redirect...");
-      // Redirect after a short delay
-      setTimeout(() => {
-        console.log("Redirecting to sign in page...");
-        window.location.href = "/auth/signin?registered=true";
-      }, 2000);
+      window.location.replace("/auth/signin?registered=true");
 
     } catch (error) {
       console.error("Error signing up:", error);
-      setIsSubmitting(false);
-      
       if (error instanceof Error) {
         // Handle specific Firebase Auth errors
         const errorMessage = error.message.includes("auth/")
@@ -133,6 +125,8 @@ export default function SignUpPage() {
       } else {
         toast.error("Failed to create account. Please try again.");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 

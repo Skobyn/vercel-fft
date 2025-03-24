@@ -99,15 +99,10 @@ export default function SignInPage() {
       
       // Redirect after a short delay
       console.log("Preparing to redirect...");
-      setTimeout(() => {
-        console.log("Redirecting to dashboard...");
-        window.location.href = "/dashboard";
-      }, 1500);
+      window.location.replace("/dashboard");
 
     } catch (error) {
       console.error("Error signing in:", error);
-      setIsSubmitting(false);
-      
       if (error instanceof Error) {
         // Handle specific Firebase Auth errors
         const errorMessage = error.message.includes("auth/")
@@ -124,6 +119,8 @@ export default function SignInPage() {
       } else {
         toast.error("Failed to sign in. Please check your credentials.");
       }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
