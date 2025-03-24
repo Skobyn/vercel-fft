@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/providers/firebase-auth-provider";
 
 const formSchema = z.object({
@@ -30,6 +30,7 @@ export default function SignInPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const { user, loading } = useAuth();
+  const redirectChecked = useRef(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,68 +49,85 @@ export default function SignInPage() {
     }
   }, []);
 
-  // Redirect if user is already signed in
+  // Redirect if user is already signed in - BUT ONLY ONCE
   useEffect(() => {
-    // Clear the redirect loop blocker flag
-    sessionStorage.removeItem('redirect_loop_blocker');
+    // Only run this check once to prevent loops
+    if (redirectChecked.current) return;
+    redirectChecked.current = true;
     
-    // Check if we're redirecting after successful sign-in (prevent loops)
+    // If we're loading, don't do anything yet
+    if (loading) return;
+    
+    // Clear any existing redirect flags to start fresh
+    sessionStorage.removeItem('redirect_count');
+    
+    // Check if we're coming from a successful sign-in
     const justSignedIn = sessionStorage.getItem('just_signed_in');
     if (justSignedIn) {
-      console.log("Just signed in, not redirecting to prevent loops");
+      console.log("Just signed in flag found, redirecting to dashboard");
+      sessionStorage.removeItem('just_signed_in');
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 100);
       return;
     }
     
-    // Check for stored user in localStorage
-    const storedUser = localStorage.getItem('auth_user');
-    if (storedUser && !loading && user) {
-      console.log("User already signed in, redirecting to dashboard");
-      window.location.replace('/dashboard');
+    // If there's a logged-in user, redirect to dashboard
+    if (user) {
+      console.log("User already authenticated, redirecting to dashboard");
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 100);
+      return;
     }
-  }, [user, loading]);
+    
+    // As a fallback, check localStorage
+    try {
+      const storedUserData = localStorage.getItem('auth_user');
+      if (storedUserData) {
+        const storedUser = JSON.parse(storedUserData);
+        // Ensure the data isn't too old (24 hour expiry)
+        const userTimestamp = storedUser.timestamp || 0;
+        if (Date.now() - userTimestamp < 24 * 60 * 60 * 1000) {
+          console.log("Found stored user data, redirecting");
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 100);
+          return;
+        } else {
+          console.log("Stored user data expired, clearing");
+          localStorage.removeItem('auth_user');
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing stored user data", e);
+      localStorage.removeItem('auth_user');
+    }
+  }, [loading]); // Only depend on loading, not on user or router
 
   // Check if Firebase Auth is initialized
   useEffect(() => {
-    const checkAuth = () => {
-      console.log("Checking auth initialization...");
-      if (auth) {
-        console.log("Auth is initialized");
-        setIsAuthInitialized(true);
-      } else {
-        console.log("Auth is not initialized");
-      }
-    };
-    checkAuth();
+    if (auth) {
+      console.log("Auth is initialized");
+      setIsAuthInitialized(true);
+    } else {
+      console.log("Auth is not initialized");
+    }
   }, []);
-
-  // Debug form state
-  useEffect(() => {
-    console.log("Form state:", {
-      isValid: form.formState.isValid,
-      errors: form.formState.errors,
-      isDirty: form.formState.isDirty,
-      isSubmitting: form.formState.isSubmitting,
-    });
-  }, [form.formState]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     console.log("Starting sign in process...");
-    if (!isAuthInitialized) {
-      console.error("Auth not initialized");
-      toast.error("Authentication is not initialized yet. Please try again.");
-      return;
-    }
-
-    if (!auth) {
-      console.error("Auth object is null");
-      toast.error("Authentication service is not available. Please try again.");
-      return;
-    }
-
     setIsSubmitting(true);
-    console.log("Attempting to sign in with email:", values.email);
+    
+    if (!isAuthInitialized) {
+      console.error("Firebase Auth is not initialized");
+      toast.error("Authentication service is not available. Please try again later.");
+      setIsSubmitting(false);
+      return;
+    }
     
     try {
+      console.log(`Attempting to sign in with email: ${values.email}`);
       const userCredential = await signInWithEmailAndPassword(
         auth,
         values.email,
@@ -119,7 +137,7 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Store auth info in localStorage as a more reliable mechanism
+      // Store auth info in localStorage
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
@@ -131,10 +149,10 @@ export default function SignInPage() {
       
       // Set a flag to prevent redirect loops
       sessionStorage.setItem('just_signed_in', 'true');
+      sessionStorage.removeItem('redirect_count');
       
-      // Force immediate redirection
-      console.log("Manual direct redirect to dashboard...");
-      window.location.replace('/dashboard');
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
 
     } catch (error) {
       console.error("Error signing in:", error);

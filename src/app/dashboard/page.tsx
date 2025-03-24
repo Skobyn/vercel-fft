@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,69 +19,80 @@ export default function DashboardPage() {
   const [localUser, setLocalUser] = useState<any>(null);
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   const [isLoading, setIsLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const authCheckRef = useRef(false);
 
-  // Check auth status on mount
+  // Check auth status on mount - but only once
   useEffect(() => {
-    // Only run the check once
-    if (authChecked) return;
+    // If we've already run the check, don't run it again
+    if (authCheckRef.current) return;
+    authCheckRef.current = true;
     
-    // Set a flag in sessionStorage to break the redirect loop
-    const isInRedirectLoop = sessionStorage.getItem('redirect_loop_blocker');
-    if (isInRedirectLoop) {
-      console.log("Potential redirect loop detected, showing auth UI instead of redirecting");
-      setAuthChecked(true);
+    console.log("Dashboard: Initial auth check");
+    
+    // Check if we just signed in
+    const justSignedIn = sessionStorage.getItem('just_signed_in');
+    if (justSignedIn) {
+      console.log("Dashboard: Just signed in, clearing flag");
+      sessionStorage.removeItem('just_signed_in');
       setIsLoading(false);
       return;
     }
     
-    const checkAuth = async () => {
-      console.log("Dashboard: Checking auth status", { 
-        firebaseUser: !!user, 
-        firebaseLoading: loading
-      });
-      
-      // Clear the sign-in flag
-      sessionStorage.removeItem('just_signed_in');
-      
-      // Check for stored user in localStorage
-      let storedUser = null;
-      try {
-        const storedUserData = localStorage.getItem('auth_user');
-        if (storedUserData) {
-          storedUser = JSON.parse(storedUserData);
-          setLocalUser(storedUser);
-          console.log("Dashboard: Using cached user data", storedUser.email);
-        }
-      } catch (error) {
-        console.error("Dashboard: Error reading localStorage", error);
-      }
-      
-      // Skip redirects if there's a user or if we're still loading
-      if (user || storedUser || loading) {
-        console.log("Dashboard: User authenticated or still loading");
-        setAuthChecked(true);
+    // Clear all redirect tracking flags to start fresh
+    sessionStorage.removeItem('redirect_count');
+    sessionStorage.removeItem('redirect_loop_blocker');
+    
+    // Wait a bit for Firebase auth to initialize fully
+    setTimeout(() => {
+      // If Firebase auth shows a user, we're authenticated
+      if (user) {
+        console.log("Dashboard: Firebase user is authenticated");
         setIsLoading(false);
         return;
       }
       
-      // After a reasonable wait, if no user is found, redirect
-      if (!user && !storedUser && !loading) {
-        console.log("Dashboard: No authenticated user found, redirecting to signin");
-        
-        // Set a flag to detect redirect loops
-        sessionStorage.setItem('redirect_loop_blocker', 'true');
-        
-        // Navigate directly without a delay
-        window.location.href = '/auth/signin';
+      // Otherwise check localStorage for a user
+      try {
+        const storedUserData = localStorage.getItem('auth_user');
+        if (storedUserData) {
+          const storedUser = JSON.parse(storedUserData);
+          // Check if the stored data isn't too old (24 hour expiry)
+          const userTimestamp = storedUser.timestamp || 0;
+          if (Date.now() - userTimestamp < 24 * 60 * 60 * 1000) {
+            console.log("Dashboard: Using stored user data");
+            setLocalUser(storedUser);
+            setIsLoading(false);
+            return;
+          } else {
+            console.log("Dashboard: Stored user data expired");
+            localStorage.removeItem('auth_user');
+          }
+        }
+      } catch (e) {
+        console.error("Dashboard: Error reading localStorage", e);
+        localStorage.removeItem('auth_user');
       }
-    };
-    
-    checkAuth();
-  }, [user, loading, authChecked]);
+      
+      // If we get here, we're not authenticated - go to signin
+      if (!loading) {
+        console.log("Dashboard: No authenticated user found");
+        window.location.href = '/auth/signin';
+      } else {
+        // Still loading, wait a bit more
+        setTimeout(() => {
+          if (!user) {
+            console.log("Dashboard: Still no user after delay");
+            window.location.href = '/auth/signin';
+          } else {
+            setIsLoading(false);
+          }
+        }, 1000);
+      }
+    }, 500);
+  }, [loading]); // Only dependency is loading
 
   // Show loading state while checking auth
-  if (isLoading || loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
