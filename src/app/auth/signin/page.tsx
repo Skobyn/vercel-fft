@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -28,6 +29,7 @@ export default function SignInPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
+  const { user, loading } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,6 +47,14 @@ export default function SignInPage() {
       toast.success("Account created! Please sign in with your credentials.");
     }
   }, []);
+
+  // Redirect if user is already signed in
+  useEffect(() => {
+    if (!loading && user) {
+      console.log("User is already signed in, redirecting to dashboard...");
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
 
   // Check if Firebase Auth is initialized
   useEffect(() => {
@@ -97,9 +107,8 @@ export default function SignInPage() {
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
       
-      // Redirect after a short delay
-      console.log("Preparing to redirect...");
-      window.location.replace("/dashboard");
+      // The auth state change will trigger the redirect
+      console.log("Waiting for auth state change to trigger redirect...");
 
     } catch (error) {
       console.error("Error signing in:", error);
