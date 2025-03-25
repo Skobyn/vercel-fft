@@ -1,37 +1,183 @@
 # Technical Context
 
-## Technology Stack
+## Development Environment
+
+### Prerequisites
+- Node.js 18+
+- npm/yarn/bun
+- Git
+- Firebase CLI
+- VS Code (recommended)
+
+### VS Code Extensions
+- ESLint
+- Prettier
+- Tailwind CSS IntelliSense
+- TypeScript and JavaScript Language Features
+- Error Lens
+- GitLens
+
+### Environment Variables
+```bash
+# Firebase Configuration
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+# Next Auth Configuration
+NEXTAUTH_URL=
+NEXTAUTH_SECRET=
+
+# Plaid API Keys
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=
+```
+
+## Tech Stack Details
 
 ### Frontend
 - **Framework**: Next.js 14
-- **Language**: TypeScript
-- **UI Library**: React 18
+- **Language**: TypeScript 5
 - **Styling**: Tailwind CSS
-- **Component Library**: Shadcn UI
-- **Form Management**: React Hook Form + Zod
-- **State Management**: React Context + Hooks
-- **Notifications**: Sonner (Toast notifications)
-
-### Backend Services
-- **Authentication**: Firebase Authentication with local persistence
-- **Database**: Firebase Firestore
-- **Analytics**: Firebase Analytics
-- **Functions**: Firebase Cloud Functions (planned)
-- **Storage**: Firebase Storage (for attachments)
-
-### External APIs
-- **Banking Integration**: Plaid API
+- **UI Components**: shadcn/ui
+- **Forms**: React Hook Form + Zod
 - **Charts**: Recharts
+- **Date Handling**: date-fns
 - **Icons**: Lucide React
 
-## Development Environment
-- **Package Manager**: npm
-- **Build Tool**: Next.js built-in build system
-- **Linting**: ESLint with Next.js configuration
+### Backend Services
+- **Authentication**: Firebase Auth
+- **Database**: Firestore
+- **Storage**: Firebase Storage
+- **Banking**: Plaid API
+- **Hosting**: Vercel
+
+### Development Tools
+- **Linting**: ESLint
 - **Formatting**: Prettier
+- **Package Manager**: npm/bun
 - **Version Control**: Git
-- **CI/CD**: GitHub Actions (planned)
-- **Debugging**: Enhanced console logging for auth flow tracking
+- **CI/CD**: GitHub Actions
+
+## Key Dependencies
+
+```json
+{
+  "dependencies": {
+    "@hookform/resolvers": "^4.1.3",
+    "@radix-ui/react-*": "^1.x",
+    "@supabase/supabase-js": "^2.49.1",
+    "firebase": "^11.5.0",
+    "next": "^14.1.0",
+    "plaid": "^31.1.0",
+    "react": "^18",
+    "react-hook-form": "^7.54.2",
+    "recharts": "^2.15.1",
+    "zod": "^3.24.2"
+  }
+}
+```
+
+## Development Workflow
+
+### 1. Setup
+```bash
+# Clone repository
+git clone https://github.com/yourusername/family-finance-tracker.git
+cd family-finance-tracker
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+
+# Start development server
+npm run dev
+```
+
+### 2. Development Standards
+- Follow TypeScript best practices
+- Use ESLint and Prettier for code quality
+- Write meaningful commit messages
+- Create feature branches for new work
+- Submit PRs for review
+
+### 3. Testing
+- Unit tests with Jest
+- Component tests with React Testing Library
+- E2E tests with Cypress
+- Manual testing checklist
+
+### 4. Deployment
+- Automated deployment via Vercel
+- Environment-specific configurations
+- Production build optimization
+- Performance monitoring
+
+## Security Considerations
+
+### 1. Authentication
+- Secure session management
+- Protected API routes
+- Role-based access control
+- OAuth 2.0 compliance
+
+### 2. Data Protection
+- Data encryption at rest
+- Secure data transmission
+- Regular security audits
+- GDPR compliance
+
+### 3. API Security
+- Rate limiting
+- Request validation
+- API key rotation
+- Error handling
+
+## Performance Optimization
+
+### 1. Code Optimization
+- Tree shaking
+- Code splitting
+- Dynamic imports
+- Bundle analysis
+
+### 2. Asset Optimization
+- Image optimization
+- Font optimization
+- CSS minification
+- Caching strategies
+
+### 3. Runtime Optimization
+- Component memoization
+- Virtual scrolling
+- Debounced inputs
+- Lazy loading
+
+## Monitoring and Analytics
+
+### 1. Error Tracking
+- Error logging
+- Performance monitoring
+- User behavior analytics
+- Crash reporting
+
+### 2. Performance Metrics
+- Core Web Vitals
+- Time to Interactive
+- First Contentful Paint
+- Largest Contentful Paint
+
+### 3. User Analytics
+- Page views
+- User engagement
+- Feature usage
+- Error rates
 
 ## Project Structure
 ```

@@ -2,17 +2,15 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
-  const router = useRouter();
-
   useEffect(() => {
     toast.success("Demo mode active - redirecting to dashboard");
     
-    // Use Next.js router for client-side navigation
-    router.push("/dashboard");
-  }, [router]);
+    // Use direct window.location for a hard redirect instead of the Next.js router
+    // This is more reliable than client-side navigation in some cases
+    window.location.href = "/dashboard";
+  }, []);
 
   return (
     <div className="container mx-auto max-w-md py-12">

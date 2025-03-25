@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,15 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
+  // Debug log to see when the component renders
+  console.log("Dashboard component rendering");
+  
+  useEffect(() => {
+    console.log("Dashboard component mounted");
+    // Debug toast to confirm component has successfully mounted
+    toast.success("Dashboard loaded successfully");
+  }, []);
+
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
   
   // Financial data with state for demo mode editing

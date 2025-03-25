@@ -1,166 +1,220 @@
 # System Patterns
 
 ## Architecture Overview
-The Family Finance Tracker follows a client-side rendered Next.js application architecture with Firebase as the backend service. The application uses the App Router pattern introduced in Next.js 13, with client components for interactive elements and server components where possible for performance.
+
+### Frontend Architecture
+```mermaid
+graph TD
+    A[Pages] --> B[Components]
+    B --> C[UI Components]
+    B --> D[Layout Components]
+    B --> E[Form Components]
+    B --> F[Chart Components]
+    G[Hooks] --> H[Custom Hooks]
+    G --> I[Context Providers]
+    J[Utils] --> K[API Helpers]
+    J --> L[Form Validators]
+    J --> M[Data Transformers]
+```
+
+### Data Flow
+```mermaid
+graph LR
+    A[User Interface] --> B[React Components]
+    B --> C[Custom Hooks]
+    C --> D[Firebase/Plaid APIs]
+    D --> E[External Services]
+    E --> D
+    D --> C
+    C --> B
+    B --> A
+```
 
 ## Key Technical Decisions
 
-### Authentication
-- Firebase Authentication with local persistence for user management
-- Simplified auth provider with fallback mechanisms
-- "Demo mode" pattern that shows content even without authentication
-- Direct navigation with window.location for critical auth redirects
-- LocalStorage backup for auth state to prevent data loss
-- Safe localStorage operations with proper error handling
+### 1. Authentication
+- Firebase Authentication for user management
+- Custom AuthProvider context
+- Protected route middleware
+- Session persistence
+- Role-based access control
 
-### Data Management
-- Firestore for storing user data, transactions, budgets, and goals
-- Typed data models with TypeScript interfaces
-- Local state management with React hooks and context
-- Optimistic UI updates for better user experience
+### 2. State Management
+- React Context for global state
+- Custom hooks for complex logic
+- Local state for component-specific data
+- Form state with react-hook-form
 
-### UI Components
-- Shadcn UI as the component library foundation
-- Custom theme with Tailwind CSS
-- Responsive design principles throughout
-- Component composition for reusability
+### 3. Data Validation
+- Zod schemas for form validation
+- Type-safe data handling
+- Runtime validation of API responses
+- Custom validation rules
 
-### API Integration
-- Plaid for bank account connection and transaction data
-- Custom hooks for API data fetching and state management
-- Error boundary implementation for graceful error handling
+### 4. API Integration
+- Firebase SDK for backend services
+- Plaid API for bank connections
+- RESTful API patterns
+- Error handling middleware
 
-## Design Patterns
+### 5. UI Components
+- shadcn/ui as component library
+- Tailwind CSS for styling
+- Responsive design patterns
+- Theme customization
 
-### Graceful Degradation Pattern
-The application is designed to fail gracefully and maintain user experience even when services are unavailable:
+## Component Organization
 
-```tsx
-// Dashboard example with fallback content
+### Directory Structure
+```
+src/
+├── app/                 # Next.js app router pages
+├── components/
+│   ├── ui/             # shadcn/ui components
+│   ├── layout/         # Layout components
+│   ├── forms/          # Form components
+│   └── charts/         # Data visualization
+├── lib/                # Utility functions
+├── hooks/              # Custom hooks
+├── providers/          # Context providers
+└── types/              # TypeScript types
+```
+
+### Component Patterns
+
+1. **Page Components**
+```typescript
+// app/dashboard/page.tsx
 export default function DashboardPage() {
   const { user, loading } = useAuth();
-  const [isUsingFallback, setIsUsingFallback] = useState(false);
   
-  useEffect(() => {
-    // Show content after a short delay regardless of auth state
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      
-      // If no user is present, show in demo mode
-      if (!loading && !user) {
-        toast.warning("You are viewing in demo mode. Some features may be limited.");
-        setIsUsingFallback(true);
-      }
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, [user, loading]);
+  if (loading) return <LoadingSpinner />;
+  if (!user) redirect('/auth/signin');
   
-  // Rest of component...
+  return <DashboardLayout>{/* content */}</DashboardLayout>;
 }
 ```
 
-### Safe Operations Pattern
-Using wrapper functions to safely perform operations that might fail:
+2. **Form Components**
+```typescript
+// components/forms/BudgetForm.tsx
+const formSchema = z.object({
+  name: z.string().min(2),
+  amount: z.number().positive(),
+  category: z.string()
+});
 
-```tsx
-// Safe localStorage operations
-const safeGetItem = (key: string): string | null => {
-  try {
-    return typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-  } catch (e) {
-    console.error(`Error reading ${key} from localStorage:`, e);
-    return null;
-  }
-};
+export function BudgetForm() {
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    mode: "onChange"
+  });
+  
+  return <Form {...form}>{/* form fields */}</Form>;
+}
 ```
 
-### Provider Pattern
-Used for auth state and theme management throughout the application with improved error handling:
-
-```tsx
-// Improved Auth Provider example
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
-  
-  // Initialize auth state with error handling
-  useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    
-    // Try to restore user from localStorage first
-    const savedUser = safeGetItem("authUser");
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error("Failed to parse saved user:", error);
-      }
-    }
-    
-    // Setup Firebase auth listener with error handling
-    // ...
-  }, []);
-  
+3. **Layout Components**
+```typescript
+// components/layout/MainLayout.tsx
+export function MainLayout({ children }) {
   return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
+    <div className="min-h-screen">
+      <Header />
+      <Sidebar />
+      <main>{children}</main>
+      <Footer />
+    </div>
   );
 }
 ```
 
-### Page Component Pattern
-Each route is represented by a page component that follows a consistent structure, now with better error handling and fallbacks:
+## Data Models
 
-```tsx
-// Dashboard page example
-export default function DashboardPage() {
-  // Simplified auth handling
-  // Always show content even if authentication fails
-  return (
-    <MainLayout>
-      {isUsingFallback && (
-        <DemoModeBanner />
-      )}
-      <div className="space-y-6">
-        {/* Page content */}
-      </div>
-    </MainLayout>
-  );
+### User Profile
+```typescript
+interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  familyId: string;
+  role: 'admin' | 'member';
+  settings: UserSettings;
 }
 ```
 
-### Custom Hooks
-Encapsulating complex logic in reusable hooks with better error handling:
-
-```tsx
-// Auth hook example
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    // Provide a useful error message
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+### Transaction
+```typescript
+interface Transaction {
+  id: string;
+  amount: number;
+  category: string;
+  date: Date;
+  description: string;
+  accountId: string;
+  familyId: string;
+  createdBy: string;
+  receipt?: string;
+}
 ```
 
-## Component Relationships
-The application follows a hierarchical component structure:
+### Budget
+```typescript
+interface Budget {
+  id: string;
+  name: string;
+  amount: number;
+  spent: number;
+  category: string;
+  period: 'monthly' | 'yearly';
+  familyId: string;
+  shared: boolean;
+}
+```
 
-1. Layout Components (MainLayout)
-2. Page Components (DashboardPage, TransactionsPage)
-3. Feature Components (TransactionList, BudgetChart)
-4. UI Components (Button, Card, Input)
-5. Feedback Components (DemoModeBanner, LoadingIndicator)
+## Error Handling
 
-## Data Flow
-1. User actions trigger form submissions or API requests
-2. Data is validated client-side
-3. Requests are sent to Firebase or external APIs
-4. UI is updated optimistically
-5. Success/error states are handled with toast notifications
-6. Fallback UI is shown if operations fail 
+1. **API Errors**
+```typescript
+try {
+  await api.createTransaction(data);
+} catch (error) {
+  if (error instanceof FirebaseError) {
+    toast.error(formatFirebaseError(error));
+  } else {
+    toast.error('An unexpected error occurred');
+  }
+}
+```
+
+2. **Form Validation**
+```typescript
+export const transactionSchema = z.object({
+  amount: z.number()
+    .positive('Amount must be positive')
+    .transform(v => Number(v.toFixed(2))),
+  description: z.string()
+    .min(2, 'Description is required')
+    .max(100, 'Description is too long')
+});
+```
+
+## Performance Optimization
+
+1. **Data Fetching**
+- Implement caching strategies
+- Use pagination for large datasets
+- Optimize Firebase queries
+- Implement debouncing for search
+
+2. **Component Optimization**
+- Memoization with useMemo/useCallback
+- Virtual scrolling for long lists
+- Lazy loading of components
+- Image optimization
+
+3. **Bundle Optimization**
+- Code splitting
+- Tree shaking
+- Dynamic imports
+- Asset optimization 

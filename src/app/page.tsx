@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CircleDollarSign, PiggyBank, LineChart, Calendar } from "lucide-react";
 
+// This is a Server Component - more efficient and reliable for the home page
 export default function Home() {
   return (
     <div className="flex flex-col min-h-[100vh]">
@@ -39,12 +40,12 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Link href="/dashboard">
+                  <a href="/dashboard">
                     <Button size="lg" className="w-full">Enter Demo</Button>
-                  </Link>
-                  <Link href="/dashboard">
+                  </a>
+                  <a href="/dashboard">
                     <Button size="lg" variant="outline" className="w-full">Explore Features</Button>
-                  </Link>
+                  </a>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-3 mt-4">
                   <p className="text-sm">

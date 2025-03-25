@@ -1,19 +1,49 @@
-# Family Finance Tracker
+# Family Finance Tracker - Project Brief
+
+## Core Requirements
+
+1. **User Authentication & Family Management**
+   - Secure Firebase authentication system
+   - Family account creation and management
+   - Role-based access control for family members
+
+2. **Financial Data Management**
+   - Transaction tracking and categorization
+   - Bank account integration via Plaid API
+   - Receipt scanning and storage
+   - Budget creation and monitoring
+
+3. **Analytics & Reporting**
+   - Interactive dashboard with financial insights
+   - Custom reports generation
+   - Spending analytics and trends
+   - Goal tracking and progress monitoring
+
+4. **User Experience**
+   - Responsive design for all devices
+   - Light/dark mode support
+   - Intuitive navigation
+   - Real-time updates
+
+## Project Goals
+
+1. Create a comprehensive family finance management solution
+2. Provide secure and reliable financial data handling
+3. Enable seamless collaboration between family members
+4. Deliver actionable financial insights
+5. Ensure excellent user experience across all devices
+
+## Success Metrics
+
+1. User engagement and retention
+2. Feature adoption rates
+3. Family account creation and member addition
+4. Transaction tracking accuracy
+5. User satisfaction and feedback
+6. System performance and reliability
 
 ## Project Overview
 A comprehensive web application that helps families track their finances, manage budgets, set savings goals, and connect with bank accounts to display real-time financial data.
-
-## Core Requirements
-1. User authentication with Firebase
-2. Dashboard with financial overview
-3. Transaction tracking and management
-4. Budget creation and monitoring
-5. Savings goals tracking
-6. Bill payment reminders
-7. Bank account integration
-8. Family sharing capabilities
-9. Reports and financial insights
-10. Mobile-responsive design
 
 ## Tech Stack
 - Next.js for frontend and API routes

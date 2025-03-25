@@ -3,6 +3,11 @@ import type { NextRequest } from 'next/server';
 
 // Middleware to handle auth redirects
 export async function middleware(request: NextRequest) {
+  // In demo mode, we don't need any redirects - all routes are accessible
+  // Just pass through all requests
+  return NextResponse.next();
+
+  /* Original authentication logic - disabled for demo mode
   // Get the pathname of the request
   const path = request.nextUrl.pathname;
 
@@ -25,6 +30,7 @@ export async function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
+  */
 }
 
 // Configure paths that should be protected
