@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MainNav } from "@/components/layout/main-nav";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,29 +13,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CircleDollarSign } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
 import { useAuth } from "@/providers/firebase-auth-provider";
 import { toast } from "sonner";
 
 export function Header() {
-  const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   const handleSignOut = async () => {
     try {
       if (auth) {
         await signOut(auth);
         toast.success("Signed out successfully");
-        
-        // Clear any session storage flags
-        if (typeof window !== 'undefined') {
-          sessionStorage.clear();
-          localStorage.removeItem('authUser');
-        }
-        
-        // Redirect to home page
         window.location.href = "/";
       }
     } catch (error) {
@@ -51,27 +41,23 @@ export function Header() {
           <CircleDollarSign className="h-6 w-6" />
           <span className="font-bold">Financial Flow</span>
         </Link>
-        {isAuthenticated && <MainNav />}
+        <MainNav />
         <div className="ml-auto flex items-center">
-          {isAuthenticated ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    {user?.photoURL ? (
-                      <AvatarImage src={user.photoURL} alt={user.displayName || ""} />
-                    ) : (
-                      <AvatarFallback>{user?.displayName?.[0] || user?.email?.[0] || "U"}</AvatarFallback>
-                    )}
+                    <AvatarFallback>{user.email?.[0] || "U"}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.displayName || "User"}</p>
+                    <p className="text-sm font-medium leading-none">{user.displayName || "User"}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user?.email}
+                      {user.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>

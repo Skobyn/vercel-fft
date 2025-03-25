@@ -6,83 +6,26 @@ import { toast } from 'sonner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  fallback?: React.ReactNode;
-  allowDemo?: boolean; // If true, will show a demo version instead of redirecting
 }
 
-export function ProtectedRoute({ 
-  children, 
-  fallback,
-  allowDemo = true
-}: ProtectedRouteProps) {
-  const { user, loading, isAuthenticated } = useAuth();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { user, loading } = useAuth();
   const [showContent, setShowContent] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [redirectCheckComplete, setRedirectCheckComplete] = useState(false);
 
+  // Check auth state and handle loading
   useEffect(() => {
-    // Get special flags that help prevent redirect loops
-    const justSignedIn = typeof window !== 'undefined' && sessionStorage.getItem('just_signed_in');
-    const redirectLoopBlocker = typeof window !== 'undefined' && sessionStorage.getItem('redirect_loop_blocker');
-    
-    console.log("ProtectedRoute flags:", { 
-      justSignedIn, 
-      redirectLoopBlocker,
-      isAuthenticated, 
-      loading 
-    });
-    
-    // Only process redirect after loading completes
     if (!loading) {
-      // If we have loop blocker flag, always show content and clear it (one-time use)
-      if (redirectLoopBlocker) {
-        console.log("Redirect loop blocker active, showing content");
-        setShowContent(true);
-        setIsDemoMode(!isAuthenticated);
-        
-        if (!isAuthenticated && allowDemo) {
-          toast.warning("You are viewing in demo mode. Some features may be limited.");
-        }
-        
-        // Clear the flag after use
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('redirect_loop_blocker');
-        }
-      } 
-      // If just signed in, show content regardless
-      else if (justSignedIn) {
-        console.log("Just signed in flag detected, showing content");
-        setShowContent(true);
-        setIsDemoMode(false);
-      }
-      // Standard authenticated flow
-      else if (isAuthenticated) {
-        console.log("User is authenticated, showing content");
-        setShowContent(true);
-        setIsDemoMode(false);
-      } 
-      // Allow demo mode if requested
-      else if (allowDemo) {
-        console.log("User not authenticated, showing demo mode");
-        setShowContent(true);
-        setIsDemoMode(true);
-        toast.warning("You are viewing in demo mode. Some features may be limited.");
-      } 
-      // No authentication, no demo mode: redirect
-      else {
-        console.log("User not authenticated and demo mode not allowed, redirecting to login");
-        if (typeof window !== 'undefined') {
-          // Use direct navigation for reliability
-          window.location.href = '/auth/signin';
-        }
-      }
+      setShowContent(true);
       
-      setRedirectCheckComplete(true);
+      // Show demo mode notification for non-authenticated users
+      if (!user) {
+        toast.warning("You are viewing in demo mode. Some features may be limited.");
+      }
     }
-  }, [loading, isAuthenticated, allowDemo]);
+  }, [user, loading]);
 
   // Show loading state while checking authentication
-  if (loading || !redirectCheckComplete) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -93,15 +36,10 @@ export function ProtectedRoute({
     );
   }
 
-  // Show fallback if provided, otherwise nothing (redirect is happening)
-  if (!showContent && fallback) {
-    return <>{fallback}</>;
-  }
-
-  // Either show authenticated content or demo content
+  // Show content (authenticated or demo mode)
   return (
     <>
-      {isDemoMode && (
+      {!user && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-6">
           <h3 className="font-medium">Demo Mode Active</h3>
           <p className="text-sm mt-1">

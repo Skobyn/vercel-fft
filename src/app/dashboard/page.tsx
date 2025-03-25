@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,26 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CircleDollarSign, ArrowUp, ArrowDown, PiggyBank } from "lucide-react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
-import { useAuth } from '@/providers/firebase-auth-provider';
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { user } = useAuth();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
-  
-  // Clear any auth redirect flags once dashboard loads successfully
-  useEffect(() => {
-    // Set redirect_loop_blocker to true on dashboard
-    // This helps prevent infinite redirects between dashboard and sign-in
-    if (typeof window !== 'undefined') {
-      // Keep the redirect blocker but clear the just_signed_in flag
-      sessionStorage.setItem('redirect_loop_blocker', 'true');
-      sessionStorage.removeItem('just_signed_in');
-      
-      console.log("Dashboard loaded - Authentication flow complete");
-    }
-  }, []);
 
   // Mock data - in a real app, this would come from an API
   const summaryData = {
@@ -111,7 +94,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <ProtectedRoute allowDemo={true}>
+    <ProtectedRoute>
       <MainLayout>
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
