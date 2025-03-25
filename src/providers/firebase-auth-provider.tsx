@@ -57,10 +57,10 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // Add this function to check and initialize Firestore collections
-const initializeUserCollections = async (user: User) => {
-  if (!db || !user) return;
+const initializeUserCollections = async (firebaseUser: FirebaseUser) => {
+  if (!db || !firebaseUser) return;
   
-  console.log("Initializing collections for user:", user.uid);
+  console.log("Initializing collections for user:", firebaseUser.uid);
   
   // Collections needed for the application
   const collections = [
@@ -74,14 +74,14 @@ const initializeUserCollections = async (user: User) => {
   
   try {
     // First check if the user has a financial profile
-    const profileRef = doc(db, 'financialProfiles', user.uid);
+    const profileRef = doc(db, 'financialProfiles', firebaseUser.uid);
     const profileSnap = await getDoc(profileRef);
     
     if (!profileSnap.exists()) {
-      console.log("Creating financial profile for user:", user.uid);
+      console.log("Creating financial profile for user:", firebaseUser.uid);
       // Create default financial profile
       const defaultProfile = {
-        userId: user.uid,
+        userId: firebaseUser.uid,
         currentBalance: 0,
         lastUpdated: new Date().toISOString(),
         currency: 'USD',
@@ -91,7 +91,7 @@ const initializeUserCollections = async (user: User) => {
       await setDoc(profileRef, defaultProfile);
       console.log("Financial profile created successfully");
     } else {
-      console.log("Financial profile already exists for user:", user.uid);
+      console.log("Financial profile already exists for user:", firebaseUser.uid);
     }
     
     return true;

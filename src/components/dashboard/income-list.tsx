@@ -31,6 +31,7 @@ import { Income } from "@/types/financial";
 import { useIncomes } from "@/hooks/use-financial-data";
 import { IncomeForm } from "@/components/forms/income-form";
 import { formatCurrency } from "@/utils/financial-utils";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Sort by date
   const sortedIncomes = [...incomes].sort((a, b) => {
@@ -106,12 +108,12 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
           id: editIncome.id,
           ...formattedValues,
         });
+        setEditDialogOpen(false);
       } else {
         console.log("Adding new income");
-        const newIncome = await onEdit(formattedValues);
-        console.log("New income created with ID:", newIncome?.id);
+        console.log("Cannot add new income through this interface");
+        toast.error("Adding new income is not supported in this view");
       }
-      setEditDialogOpen(false);
     } catch (error) {
       console.error("Error saving income:", error);
     } finally {
