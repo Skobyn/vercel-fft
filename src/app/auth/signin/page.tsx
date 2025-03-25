@@ -28,7 +28,7 @@ const formSchema = z.object({
 export default function SignInPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,11 +41,12 @@ export default function SignInPage() {
 
   // If user is already authenticated, redirect to dashboard
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && isAuthenticated) {
       console.log("User already authenticated, redirecting to dashboard");
+      // Use the more reliable direct navigation
       window.location.href = "/dashboard";
     }
-  }, [user, loading]);
+  }, [user, loading, isAuthenticated]);
 
   // Clear any session storage flags when arriving at sign-in page
   useEffect(() => {
@@ -75,6 +76,9 @@ export default function SignInPage() {
       
       console.log("Sign in successful:", userCredential.user.email);
       toast.success("Signed in successfully!");
+      
+      // Set flag to prevent redirect loops
+      sessionStorage.setItem('just_signed_in', 'true');
       
       // Simple and direct redirect approach
       console.log("Redirecting to dashboard");
@@ -183,6 +187,7 @@ export default function SignInPage() {
                     console.log("Debug Auth State:", { 
                       user, 
                       loading,
+                      isAuthenticated,
                       authFromLocalStorage: localStorage.getItem('authUser')
                     });
                     

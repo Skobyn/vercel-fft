@@ -1,60 +1,21 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CircleDollarSign, ArrowUp, ArrowDown, CreditCard, AlertCircle, Plus, PiggyBank } from "lucide-react";
+import { CircleDollarSign, ArrowUp, ArrowDown, PiggyBank } from "lucide-react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
-import { FinancialInsights } from "@/components/ai/financial-insights";
 import { useAuth } from '@/providers/firebase-auth-provider';
-import { toast } from "sonner";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
-  const [isUsingFallback, setIsUsingFallback] = useState(false);
-
-  // Simplified auth handling - just log state without redirects
-  useEffect(() => {
-    console.log("Dashboard auth state:", { 
-      user: user ? `${user.email} (${user.id})` : "null", 
-      loading,
-      pathname: typeof window !== 'undefined' ? window.location.pathname : '',
-      localStorage: typeof window !== 'undefined' ? !!localStorage.getItem("authUser") : false
-    });
-    
-    // Always show content after a short delay
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      
-      // If no user is present after loading, show a toast
-      if (!loading && !user) {
-        console.log("No authenticated user found, but showing dashboard anyway");
-        toast.warning("You are viewing in demo mode. Some features may be limited.");
-        setIsUsingFallback(true);
-      }
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, [user, loading]);
-
-  // Show loading state briefly
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Mock data - in a real app, this would come from an API
   const summaryData = {
@@ -137,270 +98,215 @@ export default function DashboardPage() {
   ];
 
   return (
-    <MainLayout>
-      {isUsingFallback && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-6">
-          <h3 className="font-medium">Demo Mode Active</h3>
-          <p className="text-sm mt-1">
-            You are viewing the dashboard in demo mode. 
-            <Button
-              variant="link"
-              className="h-auto p-0 ml-2 text-amber-800 underline"
-              onClick={() => router.push('/auth/signin')}
-            >
-              Sign in
-            </Button>
-            to access all features.
-          </p>
-        </div>
-      )}
-      
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Your financial overview for March 2025
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/connect-bank">
-              <Button>
-                <CircleDollarSign className="mr-2 h-4 w-4" />
-                Connect Bank
-              </Button>
-            </Link>
-            <DashboardCustomize />
-          </div>
-        </div>
-
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            <TabsTrigger value="bills">Bills</TabsTrigger>
-            <TabsTrigger value="goals">Goals</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
-                  <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${summaryData.balance.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Across all accounts
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Income</CardTitle>
-                  <ArrowUp className="h-4 w-4 text-emerald-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${summaryData.income.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    This month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Expenses</CardTitle>
-                  <ArrowDown className="h-4 w-4 text-rose-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${summaryData.expenses.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    This month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Savings</CardTitle>
-                  <PiggyBank className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${summaryData.savings.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    This month
-                  </p>
-                </CardContent>
-              </Card>
+    <ProtectedRoute allowDemo={true}>
+      <MainLayout>
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+              <p className="text-muted-foreground">
+                Your financial overview for March 2025
+              </p>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Transactions</CardTitle>
-                  <CardDescription>Your latest financial activity.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {recentTransactions.map((transaction) => (
-                      <div key={transaction.id} className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium leading-none">{transaction.description}</p>
-                          <p className="text-xs text-muted-foreground">{transaction.category}</p>
-                        </div>
-                        <div className={`text-sm font-semibold ${transaction.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {transaction.amount > 0 ? '+' : ''}{transaction.amount.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Link href="/transactions">
-                      <Button variant="outline" size="sm">View All</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Bills</CardTitle>
-                  <CardDescription>Bills due in the next 30 days.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {upcomingBills.map((bill) => (
-                      <div key={bill.id} className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium leading-none">{bill.name}</p>
-                          <p className="text-xs text-muted-foreground">Due: {new Date(bill.dueDate).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">${bill.amount.toFixed(2)}</span>
-                          {new Date(bill.dueDate) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) && (
-                            <AlertCircle className="h-4 w-4 text-amber-500" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Link href="/bills">
-                      <Button variant="outline" size="sm">View All</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="flex items-center gap-2">
+              <Link href="/connect-bank">
+                <Button>
+                  <CircleDollarSign className="mr-2 h-4 w-4" />
+                  Connect Bank
+                </Button>
+              </Link>
+              <DashboardCustomize />
             </div>
+          </div>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Savings Goals</CardTitle>
-                  <Link href="/goals/new">
-                    <Button variant="ghost" size="icon">
-                      <Plus className="h-4 w-4" />
-                      <span className="sr-only">Add Goal</span>
-                    </Button>
-                  </Link>
-                </div>
-                <CardDescription>Track your progress towards financial goals.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {savingsGoals.map((goal) => (
-                    <div key={goal.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{goal.name}</p>
-                          <p className="text-xs text-muted-foreground">Target: ${goal.target.toFixed(2)} by {new Date(goal.deadline).toLocaleDateString()}</p>
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              <TabsTrigger value="bills">Bills</TabsTrigger>
+              <TabsTrigger value="goals">Goals</TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
+                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${summaryData.balance.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Across all accounts
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Income</CardTitle>
+                    <ArrowUp className="h-4 w-4 text-emerald-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${summaryData.income.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      This month
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Expenses</CardTitle>
+                    <ArrowDown className="h-4 w-4 text-rose-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${summaryData.expenses.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      This month
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Savings</CardTitle>
+                    <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">${summaryData.savings.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      This month
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Transactions</CardTitle>
+                    <CardDescription>Your latest financial activity.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {recentTransactions.map((transaction) => (
+                        <div key={transaction.id} className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium leading-none">{transaction.description}</p>
+                            <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                          </div>
+                          <div className={`text-sm font-semibold ${transaction.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toFixed(2)}
+                          </div>
                         </div>
-                        <p className="text-sm font-semibold">${goal.current.toFixed(2)} / ${goal.target.toFixed(2)}</p>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted">
-                        <div
-                          className="h-2 rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-right text-muted-foreground">{Math.round((goal.current / goal.target) * 100)}% complete</p>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex justify-center">
-                  <Link href="/goals">
-                    <Button variant="outline" size="sm">Manage Goals</Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="mt-4 pt-4 border-t">
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href="/transactions">View All Transactions</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upcoming Bills</CardTitle>
+                    <CardDescription>Bills due in the next 30 days.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {upcomingBills.map((bill) => (
+                        <div key={bill.id} className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium leading-none">{bill.name}</p>
+                            <p className="text-xs text-muted-foreground">Due on {new Date(bill.dueDate).toLocaleDateString()}</p>
+                          </div>
+                          <div className="text-sm font-semibold">${bill.amount.toFixed(2)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link href="/bills">Manage Bills</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-            <FinancialInsights />
-          </TabsContent>
-
-          <TabsContent value="transactions" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Transaction List</CardTitle>
-                <CardDescription>
-                  View and filter your recent transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">
-                    Transaction list would be displayed here.
-                    <Link href="/transactions" className="underline ml-1">
-                      View full transactions page
-                    </Link>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="bills" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bills Overview</CardTitle>
-                <CardDescription>
-                  Manage your upcoming and recurring bills
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">
-                    Bills management would be displayed here.
-                    <Link href="/bills" className="underline ml-1">
-                      View full bills page
-                    </Link>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="goals" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Financial Goals</CardTitle>
-                <CardDescription>
-                  Track progress towards your savings goals
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">
-                    Savings goals would be displayed here.
-                    <Link href="/goals" className="underline ml-1">
-                      View full goals page
-                    </Link>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </MainLayout>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Savings Goals</CardTitle>
+                  <CardDescription>Track your progress towards financial goals.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {savingsGoals.map((goal) => (
+                      <div key={goal.id}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div>
+                            <p className="text-sm font-medium">{goal.name}</p>
+                            <p className="text-xs text-muted-foreground">Target: ${goal.target.toFixed(2)}</p>
+                          </div>
+                          <p className="text-sm font-medium">${goal.current.toFixed(2)} / ${goal.target.toFixed(2)}</p>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary"
+                            style={{ width: `${(goal.current / goal.target) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <Button variant="outline" className="w-full mt-4" asChild>
+                      <Link href="/goals">View All Goals</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="transactions" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Transactions</CardTitle>
+                  <CardDescription>Your recent financial activity.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Detailed transaction view coming soon.</p>
+                  <Button variant="outline" className="mt-4" asChild>
+                    <Link href="/transactions">Go to Transactions</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="bills" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bills</CardTitle>
+                  <CardDescription>Your upcoming and recent bills.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Detailed bills view coming soon.</p>
+                  <Button variant="outline" className="mt-4" asChild>
+                    <Link href="/bills">Go to Bills</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="goals" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Goals</CardTitle>
+                  <CardDescription>Your financial goals and progress.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Detailed goals view coming soon.</p>
+                  <Button variant="outline" className="mt-4" asChild>
+                    <Link href="/goals">Go to Goals</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </MainLayout>
+    </ProtectedRoute>
   );
 }

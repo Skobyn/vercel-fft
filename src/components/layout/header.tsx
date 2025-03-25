@@ -17,15 +17,30 @@ import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
 import { useAuth } from "@/providers/firebase-auth-provider";
+import { toast } from "sonner";
 
 export function Header() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const handleSignOut = async () => {
-    if (auth) {
-      await signOut(auth);
-      router.push("/auth/signin");
+    try {
+      if (auth) {
+        await signOut(auth);
+        toast.success("Signed out successfully");
+        
+        // Clear any session storage flags
+        if (typeof window !== 'undefined') {
+          sessionStorage.clear();
+          localStorage.removeItem('authUser');
+        }
+        
+        // Redirect to home page
+        window.location.href = "/";
+      }
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
     }
   };
 
@@ -36,17 +51,17 @@ export function Header() {
           <CircleDollarSign className="h-6 w-6" />
           <span className="font-bold">Financial Flow</span>
         </Link>
-        <MainNav />
+        {isAuthenticated && <MainNav />}
         <div className="ml-auto flex items-center">
-          {user ? (
+          {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    {user.photoURL ? (
+                    {user?.photoURL ? (
                       <AvatarImage src={user.photoURL} alt={user.displayName || ""} />
                     ) : (
-                      <AvatarFallback>{user.displayName?.[0] || "U"}</AvatarFallback>
+                      <AvatarFallback>{user?.displayName?.[0] || user?.email?.[0] || "U"}</AvatarFallback>
                     )}
                   </Avatar>
                 </Button>
@@ -54,13 +69,16 @@ export function Header() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                    <p className="text-sm font-medium leading-none">{user?.displayName || "User"}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
+                      {user?.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>

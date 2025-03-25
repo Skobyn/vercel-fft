@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/providers/firebase-auth-provider";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -36,6 +37,7 @@ export default function SignUpPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
+  const { user, loading, isAuthenticated } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,6 +50,14 @@ export default function SignUpPage() {
     mode: "onChange",
   });
 
+  // If user is already authenticated, redirect to dashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      console.log("User already authenticated, redirecting to dashboard");
+      window.location.href = "/dashboard";
+    }
+  }, [loading, isAuthenticated]);
+
   // Check if Firebase Auth is initialized
   useEffect(() => {
     const checkAuth = () => {
@@ -56,6 +66,13 @@ export default function SignUpPage() {
       }
     };
     checkAuth();
+  }, []);
+
+  // Clear any session storage flags when arriving at sign-up page
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.clear();
+    }
   }, []);
 
   // Debug form state
@@ -102,10 +119,11 @@ export default function SignUpPage() {
       console.log("User profile updated successfully");
 
       // Show success message
-      toast.success("Account created successfully!");
+      toast.success("Account created successfully! Please sign in.");
       
-      console.log("Preparing to redirect...");
-      window.location.replace("/auth/signin?registered=true");
+      // Use direct navigation for reliability
+      console.log("Redirecting to sign-in page...");
+      window.location.href = "/auth/signin?registered=true";
 
     } catch (error) {
       console.error("Error signing up:", error);

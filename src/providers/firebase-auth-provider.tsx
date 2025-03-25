@@ -8,6 +8,7 @@ import { User, mapFirebaseUser } from '@/types/user';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isAuthenticated: boolean;
 }
 
 // Helper to map Firebase user to our User type
@@ -24,6 +25,7 @@ const mapFirebaseUserToUser = (firebaseUser: FirebaseUser): User => {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isAuthenticated: false
 });
 
 // Safe localStorage helper functions
@@ -65,6 +67,7 @@ const safeRemoveItem = (key: string): boolean => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const initialized = useRef(false);
 
   // Initialize auth state
@@ -78,22 +81,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedUser = safeGetItem("authUser");
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
-        console.log("User restored from localStorage");
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+        console.log("User restored from localStorage:", parsedUser.email);
       } catch (error) {
         console.error("Failed to parse saved user:", error);
         safeRemoveItem("authUser");
       }
     }
     
-    // Handle case where there's no window or auth object
+    // Set up Firebase auth state listener
     if (typeof window === 'undefined' || !auth) {
       console.log("Auth provider: No window or auth object");
       setLoading(false);
       return () => {};
     }
     
-    // Set up Firebase auth state listener
     console.log("Setting up auth state listener...");
     const unsubscribe = onAuthStateChanged(auth, 
       (authUser) => {
@@ -103,13 +107,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const mappedUser = mapFirebaseUserToUser(authUser);
             setUser(mappedUser);
+            setIsAuthenticated(true);
             safeSetItem("authUser", JSON.stringify(mappedUser));
+            
+            // Set a flag to indicate successful authentication
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('just_signed_in', 'true');
+            }
+            
             console.log("User set from Firebase auth:", mappedUser.email);
           } catch (error) {
             console.error("Error mapping user:", error);
           }
         } else {
           setUser(null);
+          setIsAuthenticated(false);
           safeRemoveItem("authUser");
           console.log("User cleared from state and localStorage");
         }
@@ -135,12 +147,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log("Auth provider state:", { 
       user: user ? `${user.email} (${user.id})` : 'null', 
-      loading 
+      loading,
+      isAuthenticated
     });
-  }, [user, loading]);
+  }, [user, loading, isAuthenticated]);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
