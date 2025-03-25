@@ -175,7 +175,19 @@ export function useIncomes() {
     }
 
     try {
-      const newIncome = await FinancialService.addIncome(income, user.uid);
+      // Ensure all required fields exist in the income object
+      const formattedIncome = {
+        name: income.name,
+        amount: typeof income.amount === 'string' ? parseFloat(income.amount) : income.amount,
+        date: income.date || new Date().toISOString(),
+        frequency: income.frequency || 'monthly',
+        category: income.category || 'Salary',
+        isRecurring: income.isRecurring ?? (income.frequency !== 'once'),
+        notes: income.notes || '',
+      };
+      
+      console.log('Formatted income object for saving:', formattedIncome);
+      const newIncome = await FinancialService.addIncome(formattedIncome, user.uid);
       setIncomes(prev => [newIncome, ...prev]);
       toast.success('Income added successfully');
       return newIncome;
@@ -805,12 +817,47 @@ export function useFinancialData() {
   
   // Use useMemo to memoize the return object to prevent unnecessary rerenders
   return useMemo(() => ({
-    profile,
-    incomes,
-    bills, 
-    expenses,
-    budgets,
-    goals,
+    profile: {
+      profile: profile.profile || null,
+      loading: profile.loading,
+      error: profile.error,
+      refetch: profile.refetch,
+      updateBalance: profile.updateBalance
+    },
+    incomes: {
+      incomes: incomes.incomes || [],
+      loading: incomes.loading,
+      error: incomes.error,
+      refetch: incomes.refetch,
+      addIncome: incomes.addIncome,
+      updateIncome: incomes.updateIncome,
+      deleteIncome: incomes.deleteIncome
+    },
+    bills: {
+      bills: bills.bills || [],
+      loading: bills.loading,
+      error: bills.error,
+      refetch: bills.refetch
+    },
+    expenses: {
+      expenses: expenses.expenses || [],
+      loading: expenses.loading,
+      error: expenses.error,
+      refetch: expenses.refetch,
+      addExpense: expenses.addExpense
+    },
+    budgets: {
+      budgets: budgets.budgets || [],
+      loading: budgets.loading,
+      error: budgets.error,
+      refetch: budgets.refetch
+    },
+    goals: {
+      goals: goals.goals || [],
+      loading: goals.loading,
+      error: goals.error,
+      refetch: goals.refetch
+    },
     loading,
     refetchAll,
     updateFinancialBalance: profile.updateBalance,

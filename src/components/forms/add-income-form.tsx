@@ -17,9 +17,10 @@ const formSchema = z.object({
   amount: z.string().refine(val => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
     message: "Amount must be a positive number",
   }),
-  frequency: z.enum(["weekly", "biweekly", "monthly", "yearly"], {
+  frequency: z.enum(["once", "weekly", "biweekly", "monthly", "yearly"], {
     required_error: "Please select a frequency",
   }),
+  category: z.string().default("Salary"),
 });
 
 type AddIncomeFormProps = {
@@ -36,6 +37,7 @@ export default function AddIncomeForm({ onAddIncome }: AddIncomeFormProps) {
       name: "",
       amount: "",
       frequency: "monthly",
+      category: "Salary",
     },
     mode: "onChange",
   });
@@ -45,10 +47,13 @@ export default function AddIncomeForm({ onAddIncome }: AddIncomeFormProps) {
     try {
       setIsSubmitting(true);
       
-      // Convert amount to number
+      // Convert amount to number and add required fields
       const formattedData = {
         ...data,
         amount: parseFloat(data.amount),
+        date: new Date().toISOString(),
+        isRecurring: data.frequency !== 'once',
+        notes: '',
       };
       
       await onAddIncome(formattedData);
@@ -116,6 +121,33 @@ export default function AddIncomeForm({ onAddIncome }: AddIncomeFormProps) {
             
             <FormField
               control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Salary">Salary</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Freelance">Freelance</SelectItem>
+                      <SelectItem value="Investments">Investments</SelectItem>
+                      <SelectItem value="Rental">Rental</SelectItem>
+                      <SelectItem value="Gifts">Gifts</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
               name="frequency"
               render={({ field }) => (
                 <FormItem>
@@ -127,6 +159,7 @@ export default function AddIncomeForm({ onAddIncome }: AddIncomeFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="once">Once</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="biweekly">Bi-weekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>

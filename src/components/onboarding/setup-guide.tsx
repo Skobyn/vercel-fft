@@ -159,7 +159,20 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
     if (!user) return;
     
     try {
-      await addIncome(data);
+      // Format the income data correctly
+      const currentDate = new Date();
+      const incomeData = {
+        name: data.name,
+        amount: data.amount,
+        frequency: data.frequency || 'monthly',
+        category: 'Salary', // Default category if not provided
+        date: currentDate.toISOString(),
+        isRecurring: data.frequency !== 'once',
+        notes: data.notes || '',
+      };
+      
+      console.log("Formatted income data for saving:", incomeData);
+      await addIncome(incomeData);
       
       // Mark this step as completed
       markStepComplete("income");

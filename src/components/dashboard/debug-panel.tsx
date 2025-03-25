@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { initializeCollections } from "@/utils/database-debug";
 
@@ -14,6 +14,7 @@ interface DebugPanelProps {
 export function DebugPanel({ userId }: DebugPanelProps) {
   const [isInitializing, setIsInitializing] = useState(false);
   const [initResult, setInitResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showIndexLinks, setShowIndexLinks] = useState(false);
 
   const handleInitializeCollections = async () => {
     setIsInitializing(true);
@@ -53,6 +54,45 @@ export function DebugPanel({ userId }: DebugPanelProps) {
       }
     );
   };
+
+  // IndexLinks component with all required index creation links
+  const IndexLinks = () => (
+    <div className="space-y-2 mt-4 pt-4 border-t">
+      <h4 className="font-medium text-sm">Required Firebase Indexes</h4>
+      <p className="text-xs text-muted-foreground mb-2">
+        Click on each link to create the required indexes in Firebase Console
+      </p>
+      <div className="space-y-2">
+        <a 
+          href="https://console.firebase.google.com/v1/r/project/apex-family-finances-app/firestore/indexes?create_composite=Cllwcm9qZWN0cy9hcGV4LWZhbWlseS1maW5hbmNlcy1hcHAvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2V4cGVuc2VzL2luZGV4ZXMvXxABGgoKBnVzZXJJZBABGggKBGRhdGUQAhoMCghfX25hbWVfXxAC" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center text-xs text-blue-600 hover:underline"
+        >
+          <LinkIcon className="h-3 w-3 mr-1" />
+          Create index for expenses
+        </a>
+        <a 
+          href="https://console.firebase.google.com/v1/r/project/apex-family-finances-app/firestore/indexes?create_composite=ClZwcm9qZWN0cy9hcGV4LWZhbWlseS1maW5hbmNlcy1hcHAvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL2dvYWxzL2luZGV4ZXMvXxABGgoKBnVzZXJJZBABGg4KCnRhcmdldERhdGUQARoMCghfX25hbWVfXxAB" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center text-xs text-blue-600 hover:underline"
+        >
+          <LinkIcon className="h-3 w-3 mr-1" />
+          Create index for goals
+        </a>
+        <a 
+          href="https://console.firebase.google.com/project/apex-family-finances-app/firestore/indexes" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center text-xs text-blue-600 hover:underline"
+        >
+          <LinkIcon className="h-3 w-3 mr-1" />
+          Manage all Firestore indexes
+        </a>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-4 my-6 border rounded-lg">
@@ -99,6 +139,22 @@ export function DebugPanel({ userId }: DebugPanelProps) {
             Get help with setting up proper Firebase security rules
           </p>
         </div>
+        
+        <div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowIndexLinks(!showIndexLinks)}
+            className="w-full"
+          >
+            {showIndexLinks ? "Hide Index Links" : "Show Required Index Links"}
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1">
+            Links to create required Firestore indexes
+          </p>
+        </div>
+        
+        {showIndexLinks && <IndexLinks />}
       </div>
       
       <div className="mt-4 text-xs text-muted-foreground">

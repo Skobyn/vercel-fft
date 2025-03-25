@@ -37,8 +37,8 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     if (profile?.profile && !loading) {
       const forecast = generateCashFlowForecast(
         profile.profile.currentBalance,
-        incomes.incomes,
-        bills.bills,
+        incomes?.incomes || [],
+        bills?.bills || [],
         [], // No balance adjustments yet
         parseInt(timeframe)
       );
