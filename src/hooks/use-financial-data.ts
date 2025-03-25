@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/providers/firebase-auth-provider';
 import {
   Income, Bill, Expense, Budget, Goal, FinancialProfile
@@ -26,6 +26,7 @@ export function useFinancialProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [shouldRetry, setShouldRetry] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
@@ -50,25 +51,43 @@ export function useFinancialProfile() {
       } else {
         console.error("No financial profile data returned");
         setError(new Error("No financial profile data returned"));
+        
+        // Set a flag to retry instead of directly incrementing the counter
+        if (retryCount < 3) {
+          setShouldRetry(true);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching financial profile:', err);
       setError(err);
       toast.error('Failed to load financial profile. Please refresh the page.');
       
-      // Try again if we haven't reached max retries
+      // Set a flag to retry instead of directly incrementing the counter
       if (retryCount < 3) {
-        console.log(`Retrying financial profile fetch (${retryCount + 1}/3)...`);
-        setRetryCount(prev => prev + 1);
-        setTimeout(fetchProfile, 2000); // Retry after 2 seconds
+        setShouldRetry(true);
       }
     } finally {
       setLoading(false);
     }
-  }, [user, retryCount]);
+  // Remove retryCount from dependency array to prevent infinite loop
+  }, [user]);
+
+  // Separate useEffect for handling retries
+  useEffect(() => {
+    if (shouldRetry) {
+      console.log(`Scheduling retry for financial profile fetch (${retryCount + 1}/3)...`);
+      const timer = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setShouldRetry(false);
+        fetchProfile();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldRetry, fetchProfile, retryCount]);
 
   const updateBalance = useCallback(async (newBalance: number, reason: string) => {
-    if (!user || !profile) {
+    if (!user) {
       toast.error('You must be logged in to update your balance');
       return;
     }
@@ -77,7 +96,14 @@ export function useFinancialProfile() {
       console.log(`Updating balance for user ${user.uid} to ${newBalance}`);
       const updatedProfile = await FinancialService.updateBalance(user.uid, newBalance, reason);
       console.log("Balance updated successfully:", updatedProfile);
-      setProfile(updatedProfile);
+      
+      // Don't set state if component is unmounted or if the profile hasn't changed
+      if (profile && 
+          (profile.currentBalance !== updatedProfile.currentBalance || 
+           profile.lastUpdated !== updatedProfile.lastUpdated)) {
+        setProfile(updatedProfile);
+      }
+      
       toast.success('Balance updated successfully');
       return updatedProfile;
     } catch (err: any) {
@@ -87,41 +113,23 @@ export function useFinancialProfile() {
     }
   }, [user, profile]);
 
-  const updateFinancialBalance = async (newBalance: number, reason: string = 'Manual update') => {
-    if (!user) {
-      console.error('Cannot update balance: No authenticated user');
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Update the financial profile in Firestore
-      const updatedProfile = await FinancialService.updateBalance(user.uid, newBalance, reason);
-      
-      // Update local state with the new data
-      if (profile) {
-        setProfile({
-          ...profile,
-          currentBalance: updatedProfile.currentBalance,
-          lastUpdated: updatedProfile.lastUpdated,
-          hasCompletedSetup: true
-        });
-      } else {
-        setProfile(updatedProfile);
-      }
-      
-      return updatedProfile;
-    } catch (error) {
-      console.error('Error updating financial balance:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchProfile();
+    let mounted = true;
+    
+    const initProfile = async () => {
+      try {
+        await fetchProfile();
+      } catch (err) {
+        console.error("Error in initial profile fetch:", err);
+      }
+    };
+    
+    initProfile();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchProfile]);
 
   return {
@@ -129,7 +137,6 @@ export function useFinancialProfile() {
     loading,
     error,
     updateBalance,
-    updateFinancialBalance,
     refetch: fetchProfile
   };
 }
@@ -216,7 +223,22 @@ export function useIncomes() {
   }, [user]);
 
   useEffect(() => {
-    fetchIncomes();
+    let mounted = true;
+    
+    const initData = async () => {
+      try {
+        await fetchIncomes();
+      } catch (err) {
+        console.error("Error in initial incomes fetch:", err);
+      }
+    };
+    
+    initData();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchIncomes]);
 
   return {
@@ -233,27 +255,35 @@ export function useIncomes() {
 export function useBills() {
   const { user } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setBillsLoading] = useState(true);
+  const [error, setFetchError] = useState<any>(null);
+  let mounted = true;
 
   const fetchBills = useCallback(async () => {
     if (!user) {
-      setBills([]);
-      setLoading(false);
+      console.log("fetchBills: No user logged in");
       return;
     }
-
+    
+    setBillsLoading(true);
+    setFetchError(null);
+    
     try {
-      setLoading(true);
-      const data = await FinancialService.getBills(user.uid);
-      setBills(data);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching bills:', err);
-      setError(err);
-      toast.error('Failed to load bill data');
-    } finally {
-      setLoading(false);
+      console.log(`Fetching bills for user: ${user.uid}`);
+      const userBills = await FinancialService.getBills(user.uid);
+      
+      if (mounted) {
+        setBills(userBills);
+        setBillsLoading(false);
+        console.log(`Successfully fetched ${userBills.length} bills`);
+      }
+    } catch (error) {
+      console.error("Error fetching bills:", error);
+      if (mounted) {
+        setFetchError("Failed to fetch bills. Please try again.");
+        setBillsLoading(false);
+        setBills([]);
+      }
     }
   }, [user]);
 
@@ -344,7 +374,22 @@ export function useBills() {
   }, [user, fetchBills]);
 
   useEffect(() => {
-    fetchBills();
+    let mounted = true;
+    
+    const initData = async () => {
+      try {
+        await fetchBills();
+      } catch (err) {
+        console.error("Error in initial bills fetch:", err);
+      }
+    };
+    
+    initData();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchBills]);
 
   return {
@@ -362,27 +407,35 @@ export function useBills() {
 export function useExpenses() {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setExpensesLoading] = useState(true);
+  const [error, setFetchError] = useState<any>(null);
+  let mounted = true;
 
   const fetchExpenses = useCallback(async () => {
     if (!user) {
-      setExpenses([]);
-      setLoading(false);
+      console.log("fetchExpenses: No user logged in");
       return;
     }
-
+    
+    setExpensesLoading(true);
+    setFetchError(null);
+    
     try {
-      setLoading(true);
-      const data = await FinancialService.getExpenses(user.uid);
-      setExpenses(data);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching expenses:', err);
-      setError(err);
-      toast.error('Failed to load expense data');
-    } finally {
-      setLoading(false);
+      console.log(`Fetching expenses for user: ${user.uid}`);
+      const userExpenses = await FinancialService.getExpenses(user.uid);
+      
+      if (mounted) {
+        setExpenses(userExpenses);
+        setExpensesLoading(false);
+        console.log(`Successfully fetched ${userExpenses.length} expenses`);
+      }
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      if (mounted) {
+        setFetchError("Failed to fetch expenses. Please try again.");
+        setExpensesLoading(false);
+        setExpenses([]);
+      }
     }
   }, [user]);
 
@@ -441,7 +494,22 @@ export function useExpenses() {
   }, [user]);
 
   useEffect(() => {
-    fetchExpenses();
+    let mounted = true;
+    
+    const initData = async () => {
+      try {
+        await fetchExpenses();
+      } catch (err) {
+        console.error("Error in initial expenses fetch:", err);
+      }
+    };
+    
+    initData();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchExpenses]);
 
   return {
@@ -458,29 +526,35 @@ export function useExpenses() {
 export function useBudgets() {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setBudgetsLoading] = useState(true);
+  const [error, setFetchError] = useState<any>(null);
+  let mounted = true;
 
   const fetchBudgets = useCallback(async () => {
     if (!user) {
-      setBudgets([]);
-      setLoading(false);
+      console.log("fetchBudgets: No user logged in");
       return;
     }
-
+    
+    setBudgetsLoading(true);
+    setFetchError(null);
+    
     try {
-      setLoading(true);
-      // In a real app, this would fetch from Firebase
-      // Placeholder data for now
-      const data = await FinancialService.getBudgets(user.uid);
-      setBudgets(data);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching budgets:', err);
-      setError(err);
-      toast.error('Failed to load budget data');
-    } finally {
-      setLoading(false);
+      console.log(`Fetching budgets for user: ${user.uid}`);
+      const userBudgets = await FinancialService.getBudgets(user.uid);
+      
+      if (mounted) {
+        setBudgets(userBudgets);
+        setBudgetsLoading(false);
+        console.log(`Successfully fetched ${userBudgets.length} budgets`);
+      }
+    } catch (error) {
+      console.error("Error fetching budgets:", error);
+      if (mounted) {
+        setFetchError("Failed to fetch budgets. Please try again.");
+        setBudgetsLoading(false);
+        setBudgets([]);
+      }
     }
   }, [user]);
 
@@ -539,7 +613,22 @@ export function useBudgets() {
   }, [user]);
 
   useEffect(() => {
-    fetchBudgets();
+    let mounted = true;
+    
+    const initData = async () => {
+      try {
+        await fetchBudgets();
+      } catch (err) {
+        console.error("Error in initial budgets fetch:", err);
+      }
+    };
+    
+    initData();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchBudgets]);
 
   return {
@@ -556,27 +645,35 @@ export function useBudgets() {
 export function useGoals() {
   const { user } = useAuth();
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [loading, setGoalsLoading] = useState(true);
+  const [error, setFetchError] = useState<any>(null);
+  let mounted = true;
 
   const fetchGoals = useCallback(async () => {
     if (!user) {
-      setGoals([]);
-      setLoading(false);
+      console.log("fetchGoals: No user logged in");
       return;
     }
-
+    
+    setGoalsLoading(true);
+    setFetchError(null);
+    
     try {
-      setLoading(true);
-      const data = await FinancialService.getGoals(user.uid);
-      setGoals(data);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching goals:', err);
-      setError(err);
-      toast.error('Failed to load goal data');
-    } finally {
-      setLoading(false);
+      console.log(`Fetching goals for user: ${user.uid}`);
+      const userGoals = await FinancialService.getGoals(user.uid);
+      
+      if (mounted) {
+        setGoals(userGoals);
+        setGoalsLoading(false);
+        console.log(`Successfully fetched ${userGoals.length} goals`);
+      }
+    } catch (error) {
+      console.error("Error fetching goals:", error);
+      if (mounted) {
+        setFetchError("Failed to fetch goals. Please try again.");
+        setGoalsLoading(false);
+        setGoals([]);
+      }
     }
   }, [user]);
 
@@ -639,7 +736,22 @@ export function useGoals() {
   }, [user]);
 
   useEffect(() => {
-    fetchGoals();
+    let mounted = true;
+    
+    const initData = async () => {
+      try {
+        await fetchGoals();
+      } catch (err) {
+        console.error("Error in initial goals fetch:", err);
+      }
+    };
+    
+    initData();
+    
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
   }, [fetchGoals]);
 
   return {
@@ -662,24 +774,49 @@ export function useFinancialData() {
   const budgets = useBudgets();
   const goals = useGoals();
   
-  const loading = 
+  // Use useMemo to memoize the loading state to prevent unnecessary rerenders
+  const loading = useMemo(() => 
     profile.loading || 
     incomes.loading || 
     bills.loading || 
     expenses.loading || 
     budgets.loading ||
-    goals.loading;
+    goals.loading,
+  [
+    profile.loading, 
+    incomes.loading, 
+    bills.loading, 
+    expenses.loading, 
+    budgets.loading,
+    goals.loading
+  ]);
   
   const refetchAll = useCallback(() => {
-    profile.refetch();
-    incomes.refetch();
-    bills.refetch();
-    expenses.refetch();
-    budgets.refetch();
-    goals.refetch();
-  }, [profile, incomes, bills, expenses, budgets, goals]);
+    // Wrap in setTimeout to prevent synchronous updates from causing render loops
+    setTimeout(() => {
+      profile.refetch();
+      incomes.refetch();
+      bills.refetch();
+      expenses.refetch();
+      budgets.refetch();
+      goals.refetch();
+    }, 0);
+  }, [profile.refetch, incomes.refetch, bills.refetch, expenses.refetch, budgets.refetch, goals.refetch]);
   
-  return {
+  // Use useMemo to memoize the return object to prevent unnecessary rerenders
+  return useMemo(() => ({
+    profile,
+    incomes,
+    bills, 
+    expenses,
+    budgets,
+    goals,
+    loading,
+    refetchAll,
+    updateFinancialBalance: profile.updateBalance,
+    addIncome: incomes.addIncome,
+    addExpense: expenses.addExpense
+  }), [
     profile,
     incomes,
     bills,
@@ -687,9 +824,6 @@ export function useFinancialData() {
     budgets,
     goals,
     loading,
-    refetchAll,
-    updateFinancialBalance: profile.updateFinancialBalance,
-    addIncome: incomes.addIncome,
-    addExpense: expenses.addExpense
-  };
+    refetchAll
+  ]);
 } 
