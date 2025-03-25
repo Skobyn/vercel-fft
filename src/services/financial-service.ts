@@ -137,6 +137,7 @@ export const updateBalance = async (
 // INCOME OPERATIONS
 export const addIncome = async (income: Omit<Income, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<Income> => {
   try {
+    console.log(`Adding income for user ${userId}:`, income);
     const now = new Date().toISOString();
     const newIncome: Omit<Income, 'id'> = {
       ...income,
@@ -145,7 +146,9 @@ export const addIncome = async (income: Omit<Income, 'id' | 'userId' | 'createdA
       updatedAt: now,
     };
     
+    // Always use the user-specific path for new incomes
     const docRef = await addDoc(collection(db, `users/${userId}/incomes`), newIncome);
+    console.log(`Income added successfully with ID: ${docRef.id}`);
     return { id: docRef.id, ...newIncome };
   } catch (error) {
     console.error('Error adding income:', error);
@@ -247,6 +250,7 @@ export const getIncomes = async (userId: string): Promise<Income[]> => {
 // BILL OPERATIONS
 export const addBill = async (bill: Omit<Bill, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<Bill> => {
   try {
+    console.log(`Adding bill for user ${userId}:`, bill);
     const now = new Date().toISOString();
     const newBill: Omit<Bill, 'id'> = {
       ...bill,
@@ -255,7 +259,9 @@ export const addBill = async (bill: Omit<Bill, 'id' | 'userId' | 'createdAt' | '
       updatedAt: now,
     };
     
-    const docRef = await addDoc(collection(db, 'bills'), newBill);
+    // Use user-specific path
+    const docRef = await addDoc(collection(db, `users/${userId}/bills`), newBill);
+    console.log(`Bill added successfully with ID: ${docRef.id}`);
     return { id: docRef.id, ...newBill };
   } catch (error) {
     console.error('Error adding bill:', error);
@@ -265,13 +271,14 @@ export const addBill = async (bill: Omit<Bill, 'id' | 'userId' | 'createdAt' | '
 
 export const updateBill = async (bill: Partial<Bill> & { id: string }, userId: string): Promise<void> => {
   try {
+    console.log(`Updating bill for user ${userId}, ID: ${bill.id}`);
     const { id, ...data } = bill;
-    const billRef = doc(db, 'bills', id);
+    const billRef = doc(db, `users/${userId}/bills`, id);
     
-    // Verify ownership
+    // Verify existence
     const billSnap = await getDoc(billRef);
-    if (!billSnap.exists() || billSnap.data().userId !== userId) {
-      throw new Error('Bill not found or unauthorized');
+    if (!billSnap.exists()) {
+      throw new Error('Bill not found');
     }
     
     const updatedData = {
@@ -280,6 +287,7 @@ export const updateBill = async (bill: Partial<Bill> & { id: string }, userId: s
     };
     
     await updateDoc(billRef, updatedData);
+    console.log(`Bill updated successfully: ${id}`);
   } catch (error) {
     console.error('Error updating bill:', error);
     throw error;
@@ -288,15 +296,17 @@ export const updateBill = async (bill: Partial<Bill> & { id: string }, userId: s
 
 export const deleteBill = async (id: string, userId: string): Promise<void> => {
   try {
-    const billRef = doc(db, 'bills', id);
+    console.log(`Deleting bill for user ${userId}, ID: ${id}`);
+    const billRef = doc(db, `users/${userId}/bills`, id);
     
-    // Verify ownership
+    // Verify existence
     const billSnap = await getDoc(billRef);
-    if (!billSnap.exists() || billSnap.data().userId !== userId) {
-      throw new Error('Bill not found or unauthorized');
+    if (!billSnap.exists()) {
+      throw new Error('Bill not found');
     }
     
     await deleteDoc(billRef);
+    console.log(`Bill deleted successfully: ${id}`);
   } catch (error) {
     console.error('Error deleting bill:', error);
     throw error;
@@ -357,12 +367,13 @@ export const getBills = async (userId: string): Promise<Bill[]> => {
 // Mark a bill as paid
 export const markBillAsPaid = async (id: string, userId: string, paidDate?: string): Promise<void> => {
   try {
-    const billRef = doc(db, 'bills', id);
+    console.log(`Marking bill as paid for user ${userId}, ID: ${id}`);
+    const billRef = doc(db, `users/${userId}/bills`, id);
     
-    // Verify ownership
+    // Verify existence
     const billSnap = await getDoc(billRef);
-    if (!billSnap.exists() || billSnap.data().userId !== userId) {
-      throw new Error('Bill not found or unauthorized');
+    if (!billSnap.exists()) {
+      throw new Error('Bill not found');
     }
     
     const updateData = {
@@ -372,6 +383,7 @@ export const markBillAsPaid = async (id: string, userId: string, paidDate?: stri
     };
     
     await updateDoc(billRef, updateData);
+    console.log(`Bill marked as paid: ${id}`);
     
     // If this is a recurring bill, create the next instance
     const billData = billSnap.data() as Bill;
@@ -401,6 +413,7 @@ export const markBillAsPaid = async (id: string, userId: string, paidDate?: stri
       await updateDoc(billRef, {
         nextDueDate: nextDate.toISOString()
       });
+      console.log(`Next due date updated for recurring bill: ${id}`);
     }
   } catch (error) {
     console.error('Error marking bill as paid:', error);
@@ -411,6 +424,7 @@ export const markBillAsPaid = async (id: string, userId: string, paidDate?: stri
 // EXPENSE OPERATIONS
 export const addExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<Expense> => {
   try {
+    console.log(`Adding expense for user ${userId}:`, expense);
     const now = new Date().toISOString();
     const newExpense: Omit<Expense, 'id'> = {
       ...expense,
@@ -419,7 +433,9 @@ export const addExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'creat
       updatedAt: now,
     };
     
-    const docRef = await addDoc(collection(db, 'expenses'), newExpense);
+    // Use user-specific path
+    const docRef = await addDoc(collection(db, `users/${userId}/expenses`), newExpense);
+    console.log(`Expense added successfully with ID: ${docRef.id}`);
     return { id: docRef.id, ...newExpense };
   } catch (error) {
     console.error('Error adding expense:', error);
@@ -429,13 +445,14 @@ export const addExpense = async (expense: Omit<Expense, 'id' | 'userId' | 'creat
 
 export const updateExpense = async (expense: Partial<Expense> & { id: string }, userId: string): Promise<void> => {
   try {
+    console.log(`Updating expense for user ${userId}, ID: ${expense.id}`);
     const { id, ...data } = expense;
-    const expenseRef = doc(db, 'expenses', id);
+    const expenseRef = doc(db, `users/${userId}/expenses`, id);
     
-    // Verify ownership
+    // Verify existence
     const expenseSnap = await getDoc(expenseRef);
-    if (!expenseSnap.exists() || expenseSnap.data().userId !== userId) {
-      throw new Error('Expense not found or unauthorized');
+    if (!expenseSnap.exists()) {
+      throw new Error('Expense not found');
     }
     
     const updatedData = {
@@ -444,6 +461,7 @@ export const updateExpense = async (expense: Partial<Expense> & { id: string }, 
     };
     
     await updateDoc(expenseRef, updatedData);
+    console.log(`Expense updated successfully: ${id}`);
   } catch (error) {
     console.error('Error updating expense:', error);
     throw error;
@@ -452,15 +470,17 @@ export const updateExpense = async (expense: Partial<Expense> & { id: string }, 
 
 export const deleteExpense = async (id: string, userId: string): Promise<void> => {
   try {
-    const expenseRef = doc(db, 'expenses', id);
+    console.log(`Deleting expense for user ${userId}, ID: ${id}`);
+    const expenseRef = doc(db, `users/${userId}/expenses`, id);
     
-    // Verify ownership
+    // Verify existence
     const expenseSnap = await getDoc(expenseRef);
-    if (!expenseSnap.exists() || expenseSnap.data().userId !== userId) {
-      throw new Error('Expense not found or unauthorized');
+    if (!expenseSnap.exists()) {
+      throw new Error('Expense not found');
     }
     
     await deleteDoc(expenseRef);
+    console.log(`Expense deleted successfully: ${id}`);
   } catch (error) {
     console.error('Error deleting expense:', error);
     throw error;
@@ -469,17 +489,52 @@ export const deleteExpense = async (id: string, userId: string): Promise<void> =
 
 export const getExpenses = async (userId: string): Promise<Expense[]> => {
   try {
-    const expensesQuery = query(
-      collection(db, 'expenses'),
-      where('userId', '==', userId),
-      orderBy('date', 'desc')
-    );
+    console.log(`Getting expenses for user ${userId} from users/${userId}/expenses`);
     
-    const querySnapshot = await getDocs(expensesQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+    // Try the user-specific path first
+    try {
+      const expensesQuery = query(
+        collection(db, `users/${userId}/expenses`),
+        orderBy('date', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(expensesQuery);
+      const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+      console.log(`Found ${results.length} expenses in users/${userId}/expenses`);
+      return results;
+    } catch (pathError) {
+      console.error(`Error accessing users/${userId}/expenses:`, pathError);
+      
+      // Try the global collection as fallback
+      console.log("Trying global expenses collection as fallback");
+      const fallbackQuery = query(
+        collection(db, 'expenses'),
+        where('userId', '==', userId),
+        orderBy('date', 'desc')
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const fallbackResults = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+      console.log(`Found ${fallbackResults.length} expenses in global collection`);
+      
+      // If we found items in the global collection, migrate them to the user-specific path
+      if (fallbackResults.length > 0) {
+        console.log("Migrating expense data to user-specific path");
+        
+        for (const expense of fallbackResults) {
+          const { id, ...data } = expense;
+          await setDoc(doc(db, `users/${userId}/expenses`, id), data);
+        }
+      }
+      
+      return fallbackResults;
+    }
   } catch (error) {
     console.error('Error getting expenses:', error);
-    throw error;
+    
+    // Return empty array rather than throwing
+    console.log("Returning empty expenses array due to error");
+    return [];
   }
 };
 
@@ -566,6 +621,7 @@ export const getBudgets = async (userId: string): Promise<any[]> => {
 // GOAL OPERATIONS
 export const addGoal = async (goal: Omit<Goal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<Goal> => {
   try {
+    console.log(`Adding goal for user ${userId}:`, goal);
     const now = new Date().toISOString();
     const newGoal: Omit<Goal, 'id'> = {
       ...goal,
@@ -574,7 +630,9 @@ export const addGoal = async (goal: Omit<Goal, 'id' | 'userId' | 'createdAt' | '
       updatedAt: now,
     };
     
-    const docRef = await addDoc(collection(db, 'goals'), newGoal);
+    // Use user-specific path
+    const docRef = await addDoc(collection(db, `users/${userId}/goals`), newGoal);
+    console.log(`Goal added successfully with ID: ${docRef.id}`);
     return { id: docRef.id, ...newGoal };
   } catch (error) {
     console.error('Error adding goal:', error);
@@ -584,13 +642,14 @@ export const addGoal = async (goal: Omit<Goal, 'id' | 'userId' | 'createdAt' | '
 
 export const updateGoal = async (goal: Partial<Goal> & { id: string }, userId: string): Promise<void> => {
   try {
+    console.log(`Updating goal for user ${userId}, ID: ${goal.id}`);
     const { id, ...data } = goal;
-    const goalRef = doc(db, 'goals', id);
+    const goalRef = doc(db, `users/${userId}/goals`, id);
     
-    // Verify ownership
+    // Verify existence
     const goalSnap = await getDoc(goalRef);
-    if (!goalSnap.exists() || goalSnap.data().userId !== userId) {
-      throw new Error('Goal not found or unauthorized');
+    if (!goalSnap.exists()) {
+      throw new Error('Goal not found');
     }
     
     const updatedData = {
@@ -599,6 +658,7 @@ export const updateGoal = async (goal: Partial<Goal> & { id: string }, userId: s
     };
     
     await updateDoc(goalRef, updatedData);
+    console.log(`Goal updated successfully: ${id}`);
   } catch (error) {
     console.error('Error updating goal:', error);
     throw error;
@@ -607,15 +667,17 @@ export const updateGoal = async (goal: Partial<Goal> & { id: string }, userId: s
 
 export const deleteGoal = async (id: string, userId: string): Promise<void> => {
   try {
-    const goalRef = doc(db, 'goals', id);
+    console.log(`Deleting goal for user ${userId}, ID: ${id}`);
+    const goalRef = doc(db, `users/${userId}/goals`, id);
     
-    // Verify ownership
+    // Verify existence
     const goalSnap = await getDoc(goalRef);
-    if (!goalSnap.exists() || goalSnap.data().userId !== userId) {
-      throw new Error('Goal not found or unauthorized');
+    if (!goalSnap.exists()) {
+      throw new Error('Goal not found');
     }
     
     await deleteDoc(goalRef);
+    console.log(`Goal deleted successfully: ${id}`);
   } catch (error) {
     console.error('Error deleting goal:', error);
     throw error;
@@ -624,17 +686,52 @@ export const deleteGoal = async (id: string, userId: string): Promise<void> => {
 
 export const getGoals = async (userId: string): Promise<Goal[]> => {
   try {
-    const goalsQuery = query(
-      collection(db, 'goals'),
-      where('userId', '==', userId),
-      orderBy('targetDate', 'asc')
-    );
+    console.log(`Getting goals for user ${userId} from users/${userId}/goals`);
     
-    const querySnapshot = await getDocs(goalsQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Goal));
+    // Try the user-specific path first
+    try {
+      const goalsQuery = query(
+        collection(db, `users/${userId}/goals`),
+        orderBy('targetDate', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(goalsQuery);
+      const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Goal));
+      console.log(`Found ${results.length} goals in users/${userId}/goals`);
+      return results;
+    } catch (pathError) {
+      console.error(`Error accessing users/${userId}/goals:`, pathError);
+      
+      // Try the global collection as fallback
+      console.log("Trying global goals collection as fallback");
+      const fallbackQuery = query(
+        collection(db, 'goals'),
+        where('userId', '==', userId),
+        orderBy('targetDate', 'asc')
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const fallbackResults = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Goal));
+      console.log(`Found ${fallbackResults.length} goals in global collection`);
+      
+      // If we found items in the global collection, migrate them to the user-specific path
+      if (fallbackResults.length > 0) {
+        console.log("Migrating goal data to user-specific path");
+        
+        for (const goal of fallbackResults) {
+          const { id, ...data } = goal;
+          await setDoc(doc(db, `users/${userId}/goals`, id), data);
+        }
+      }
+      
+      return fallbackResults;
+    }
   } catch (error) {
     console.error('Error getting goals:', error);
-    throw error;
+    
+    // Return empty array rather than throwing
+    console.log("Returning empty goals array due to error");
+    return [];
   }
 };
 
@@ -644,6 +741,7 @@ export const addIncomeRecord = async (
   incomeData: { name: string; amount: number; frequency: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually' }
 ): Promise<Income> => {
   try {
+    console.log(`Adding income record for user ${userId}:`, incomeData);
     // Create the income data object
     const now = new Date().toISOString();
     const newIncome: Omit<Income, 'id'> = {
@@ -659,8 +757,9 @@ export const addIncomeRecord = async (
       updatedAt: now,
     };
     
-    // Add to Firestore
-    const docRef = await addDoc(collection(db, 'incomes'), newIncome);
+    // Add to Firestore - using user-specific path
+    const docRef = await addDoc(collection(db, `users/${userId}/incomes`), newIncome);
+    console.log(`Income record added successfully with ID: ${docRef.id}`);
     
     // Return the complete income object with id
     return {
@@ -679,6 +778,7 @@ export const addExpenseRecord = async (
   expenseData: { name: string; amount: number; category: string; frequency: string }
 ): Promise<Expense> => {
   try {
+    console.log(`Adding expense record for user ${userId}:`, expenseData);
     // Create the expense data object
     const now = new Date().toISOString();
     const newExpense: Omit<Expense, 'id'> = {
@@ -692,8 +792,9 @@ export const addExpenseRecord = async (
       updatedAt: now,
     };
     
-    // Add to Firestore
-    const docRef = await addDoc(collection(db, 'expenses'), newExpense);
+    // Add to Firestore - using user-specific path
+    const docRef = await addDoc(collection(db, `users/${userId}/expenses`), newExpense);
+    console.log(`Expense record added successfully with ID: ${docRef.id}`);
     
     // Return the complete expense object with id
     return {
