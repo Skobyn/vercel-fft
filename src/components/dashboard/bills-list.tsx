@@ -65,19 +65,24 @@ export function BillsList() {
 
   const handleSubmit = async (values: any) => {
     try {
+      console.log("Attempting to save bill:", values);
       setIsSubmitting(true);
       const formattedValues = {
         ...values,
         dueDate: values.dueDate.toISOString(),
       };
+      console.log("Formatted bill values:", formattedValues);
 
       if (currentBill) {
+        console.log("Updating existing bill:", currentBill.id);
         await updateBill({
           id: currentBill.id,
           ...formattedValues,
         });
       } else {
-        await addBill(formattedValues);
+        console.log("Adding new bill");
+        const newBill = await addBill(formattedValues);
+        console.log("New bill created with ID:", newBill?.id);
       }
       setDialogOpen(false);
     } catch (error) {

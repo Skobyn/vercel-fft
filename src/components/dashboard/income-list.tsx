@@ -90,14 +90,32 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
     }
   };
 
-  const handleEditSubmit = async (values: any) => {
-    if (editIncome) {
-      await onEdit({
-        id: editIncome.id,
+  const handleSubmit = async (values: any) => {
+    try {
+      console.log("Attempting to save income:", values);
+      setIsSubmitting(true);
+      const formattedValues = {
         ...values,
-      });
+        date: values.date.toISOString(),
+      };
+      console.log("Formatted income values:", formattedValues);
+
+      if (editIncome) {
+        console.log("Updating existing income:", editIncome.id);
+        await onEdit({
+          id: editIncome.id,
+          ...formattedValues,
+        });
+      } else {
+        console.log("Adding new income");
+        const newIncome = await onEdit(formattedValues);
+        console.log("New income created with ID:", newIncome?.id);
+      }
       setEditDialogOpen(false);
-      setEditIncome(null);
+    } catch (error) {
+      console.error("Error saving income:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -242,7 +260,7 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
             </AlertDialogHeader>
             <IncomeForm
               income={editIncome}
-              onSubmit={handleEditSubmit}
+              onSubmit={handleSubmit}
               onCancel={() => setEditDialogOpen(false)}
             />
           </AlertDialogContent>

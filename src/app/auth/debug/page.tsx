@@ -5,11 +5,15 @@ import { AuthDebug } from "@/components/auth/auth-debug";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/firebase-auth-provider";
 import { LogIn } from "lucide-react";
+import { db } from "@/lib/firebase-client";
+import { addDoc, collection } from "firebase/firestore";
+import { toast } from "sonner";
 
 export default function AuthDebugPage() {
-  const { signInWithGoogle, signOut } = useAuth();
+  const { signInWithGoogle, signOut, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTestingDb, setIsTestingDb] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -31,6 +35,34 @@ export default function AuthDebugPage() {
       setError(err.message || "Failed to sign out");
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const testFirestoreWrite = async () => {
+    if (!user) {
+      toast.error("You must be signed in to test database writes");
+      return;
+    }
+    
+    setIsTestingDb(true);
+    try {
+      // Try to write a test document to Firestore
+      const testData = {
+        userId: user.uid,
+        text: "Test data",
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log("Attempting to write test data to Firestore:", testData);
+      const docRef = await addDoc(collection(db, "test_writes"), testData);
+      console.log("Test write successful with document ID:", docRef.id);
+      toast.success("Successfully wrote to Firestore!");
+    } catch (err: any) {
+      console.error("Firestore test write failed:", err);
+      toast.error(`Failed to write to Firestore: ${err.message}`);
+      setError(err.message || "Failed to write to database");
+    } finally {
+      setIsTestingDb(false);
     }
   };
 
@@ -63,6 +95,23 @@ export default function AuthDebugPage() {
           <p className="text-sm">{error}</p>
         </div>
       )}
+      
+      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-sm border my-8">
+        <h2 className="text-xl font-semibold mb-4">Database Write Test</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          This test will attempt to write data to Firestore to verify your write permissions.
+        </p>
+        <Button 
+          onClick={testFirestoreWrite} 
+          disabled={isTestingDb || !user}
+          className="w-full"
+        >
+          {isTestingDb ? 'Testing...' : 'Test Database Write'}
+        </Button>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Note: You must be signed in to test database writes.
+        </p>
+      </div>
       
       <AuthDebug />
       

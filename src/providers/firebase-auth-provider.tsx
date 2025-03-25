@@ -56,6 +56,51 @@ const AuthContext = createContext<AuthContextType>({
   updateUserInfo: async () => {}
 });
 
+// Add this function to check and initialize Firestore collections
+const initializeUserCollections = async (user: User) => {
+  if (!db || !user) return;
+  
+  console.log("Initializing collections for user:", user.uid);
+  
+  // Collections needed for the application
+  const collections = [
+    'financialProfiles',
+    'incomes',
+    'bills',
+    'expenses',
+    'budgets',
+    'goals'
+  ];
+  
+  try {
+    // First check if the user has a financial profile
+    const profileRef = doc(db, 'financialProfiles', user.uid);
+    const profileSnap = await getDoc(profileRef);
+    
+    if (!profileSnap.exists()) {
+      console.log("Creating financial profile for user:", user.uid);
+      // Create default financial profile
+      const defaultProfile = {
+        userId: user.uid,
+        currentBalance: 0,
+        lastUpdated: new Date().toISOString(),
+        currency: 'USD',
+        hasCompletedSetup: false
+      };
+      
+      await setDoc(profileRef, defaultProfile);
+      console.log("Financial profile created successfully");
+    } else {
+      console.log("Financial profile already exists for user:", user.uid);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error initializing user collections:", error);
+    throw error;
+  }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Then try to get additional profile info from Firestore
         if (db) {
+          // Initialize user collections if needed
+          await initializeUserCollections(firebaseUser);
+          
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDoc = await getDoc(userDocRef);
           
