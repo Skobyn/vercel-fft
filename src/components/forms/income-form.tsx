@@ -31,8 +31,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { INCOME_CATEGORIES } from "@/types/financial";
 import { Income } from "@/types/financial";
+import { Textarea } from "@/components/ui/textarea";
 
 const incomeFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -45,6 +47,7 @@ const incomeFormSchema = z.object({
     required_error: "Date is required",
   }),
   frequency: z.string().min(1, "Frequency is required"),
+  isRecurring: z.boolean().default(false),
   notes: z.string().optional(),
 });
 
@@ -57,7 +60,7 @@ interface IncomeFormProps {
   isSubmitting?: boolean;
 }
 
-export default function IncomeForm({
+export function IncomeForm({
   income,
   onSubmit,
   onCancel,
@@ -71,6 +74,7 @@ export default function IncomeForm({
     category: income?.category || "",
     date: income?.date ? new Date(income.date) : new Date(),
     frequency: income?.frequency || "monthly",
+    isRecurring: income?.isRecurring || false,
     notes: income?.notes || "",
   };
 
@@ -95,7 +99,7 @@ export default function IncomeForm({
               <FormItem>
                 <FormLabel>Income Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Salary, Freelance Work, etc" {...field} />
+                  <Input placeholder="Salary, Freelance, etc" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -212,11 +216,31 @@ export default function IncomeForm({
                     <SelectItem value="biweekly">Bi-Weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="semiannually">Semi-Annually</SelectItem>
                     <SelectItem value="annually">Annually</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="isRecurring"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>Recurring Income</FormLabel>
+                  <FormDescription>
+                    This income repeats regularly
+                  </FormDescription>
+                </div>
               </FormItem>
             )}
           />
@@ -228,7 +252,11 @@ export default function IncomeForm({
               <FormItem className="md:col-span-2">
                 <FormLabel>Notes (Optional)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Additional information" {...field} />
+                  <Textarea 
+                    placeholder="Additional information" 
+                    className="resize-none" 
+                    {...field} 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

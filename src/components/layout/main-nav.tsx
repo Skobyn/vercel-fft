@@ -36,8 +36,13 @@ export function MainNav() {
       active: pathname === "/budgets",
     },
     {
+      href: "/income",
+      label: "Income",
+      active: pathname === "/income",
+    },
+    {
       href: "/bills/expenses",
-      label: "Bills",
+      label: "Bills & Expenses",
       active: pathname === "/bills/expenses" || pathname === "/bills",
     },
     {

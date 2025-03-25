@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/firebase-auth-provider";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,14 @@ import { CashFlowChart } from "@/components/dashboard/cash-flow-chart";
 import { IncomeList } from "@/components/dashboard/income-list";
 import { BillsList } from "@/components/dashboard/bills-list";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SetupGuide } from "@/components/onboarding/setup-guide";
+import { useFinancialProfile } from "@/hooks/use-financial-data";
+import { ArrowRight, X } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, loading, demoMode } = useAuth();
+  const { profile, loading: profileLoading } = useFinancialProfile();
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -21,7 +26,21 @@ export default function DashboardPage() {
     }
   }, [user, loading, router]);
 
-  if (loading) {
+  // Check if it's a new user to show setup guide
+  useEffect(() => {
+    if (user && profile?.profile && !profileLoading) {
+      // Show setup guide for new users or if they haven't completed setup
+      const isFirstVisit = !localStorage.getItem("has_visited_dashboard");
+      const hasCompletedSetup = profile.profile.hasCompletedSetup;
+      
+      if (isFirstVisit || !hasCompletedSetup) {
+        setShowSetupGuide(true);
+        localStorage.setItem("has_visited_dashboard", "true");
+      }
+    }
+  }, [user, profile, profileLoading]);
+
+  if (loading || profileLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">
@@ -57,15 +76,45 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <BalanceCard />
-          <CashFlowChart />
-        </div>
+        {showSetupGuide ? (
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Welcome to Achievr!</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSetupGuide(false)}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Close Setup Guide
+              </Button>
+            </div>
+            <SetupGuide onClose={() => setShowSetupGuide(false)} />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <BalanceCard />
+              <CashFlowChart />
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <IncomeList />
-          <BillsList />
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <IncomeList />
+              <BillsList />
+            </div>
+            
+            <div className="mt-6 text-center">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSetupGuide(true)}
+                className="mx-auto"
+              >
+                Open Setup Guide
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </MainLayout>
   );

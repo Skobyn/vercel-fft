@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { CircleDollarSign } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 import { useAuth } from "@/providers/firebase-auth-provider";
 
@@ -35,7 +35,17 @@ const formSchema = z.object({
 export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
+
+  // Redirect if already signed in
+  useEffect(() => {
+    if (user) {
+      router.push("/dashboard");
+    }
+    
+    // Clear any potential redirect loop blockers
+    sessionStorage.removeItem("redirect_loop_blocker");
+  }, [user, router]);
 
   // Create form
   const form = useForm<z.infer<typeof formSchema>>({
@@ -59,8 +69,10 @@ export default function SignInPage() {
         document.cookie = "remember-me=true; max-age=2592000; path=/"; // 30 days
       }
       
-      toast.success("Signed in successfully");
-      router.push("/dashboard");
+      // Set flag for redirection
+      sessionStorage.setItem("just_signed_in", "true");
+      
+      // The redirection will be handled by the auth provider
     } catch (error: any) {
       console.error("Sign in error:", error);
       toast.error(error.message || "Failed to sign in");
@@ -88,10 +100,10 @@ export default function SignInPage() {
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/40">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center space-y-2 mb-6">
-          <div className="p-2 bg-primary text-primary-foreground rounded-full">
-            <CircleDollarSign className="h-6 w-6" />
+          <div className="p-2 bg-green-600 text-white rounded-full">
+            <TrendingUp className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold">Financial Flow</h1>
+          <h1 className="text-2xl font-bold">Achievr</h1>
         </div>
 
         <Card>
