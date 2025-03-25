@@ -25,7 +25,7 @@ export default function DashboardPage() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">
-          <LoadingSpinner size="xl" />
+          <LoadingSpinner size="lg" />
         </div>
       </MainLayout>
     );
