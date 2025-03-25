@@ -1,0 +1,19 @@
+{
+  "name": "achievr-firebase-tools",
+  "version": "1.0.0",
+  "description": "Tools for managing Firebase data in Achievr app",
+  "main": "clear-firebase.js",
+  "scripts": {
+    "clean": "node clear-firebase.js"
+  },
+  "keywords": [
+    "firebase",
+    "cleanup",
+    "achievr"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase-admin": "^11.10.1"
+  }
+} 
