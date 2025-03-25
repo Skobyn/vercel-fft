@@ -20,8 +20,8 @@ export default function Home() {
           <Link className="text-sm font-medium hover:underline underline-offset-4" href="/about">
             About
           </Link>
-          <Link className="text-sm font-medium hover:underline underline-offset-4" href="/auth/signin">
-            Sign In
+          <Link className="text-sm font-medium hover:underline underline-offset-4" href="/dashboard">
+            Dashboard
           </Link>
         </nav>
       </header>
@@ -39,12 +39,17 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Link href="/auth/signup">
-                    <Button size="lg" className="w-full">Get Started</Button>
+                  <Link href="/dashboard">
+                    <Button size="lg" className="w-full">Enter Demo</Button>
                   </Link>
-                  <Link href="/auth/signin">
-                    <Button size="lg" variant="outline" className="w-full">Sign In</Button>
+                  <Link href="/dashboard">
+                    <Button size="lg" variant="outline" className="w-full">Explore Features</Button>
                   </Link>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-3 mt-4">
+                  <p className="text-sm">
+                    <strong>Demo Mode Active:</strong> All features are available without authentication.
+                  </p>
                 </div>
               </div>
               <div className="mx-auto flex items-center justify-center">

@@ -5,23 +5,42 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CircleDollarSign, ArrowUp, ArrowDown, PiggyBank } from "lucide-react";
+import { CircleDollarSign, ArrowUp, ArrowDown, PiggyBank, Edit2, Check } from "lucide-react";
 import Link from "next/link";
 import { DashboardCustomize } from "./customize";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
-
-  // Mock data - in a real app, this would come from an API
-  const summaryData = {
+  
+  // Financial data with state for demo mode editing
+  const [summaryData, setSummaryData] = useState({
     balance: 5250.75,
     income: 4500.00,
     expenses: 3250.25,
     savings: 1249.75,
-  };
+  });
+  
+  // Track which values are being edited
+  const [editing, setEditing] = useState({
+    balance: false,
+    income: false,
+    expenses: false,
+    savings: false,
+  });
+  
+  // Temporary values for editing
+  const [tempValues, setTempValues] = useState({
+    balance: "5250.75",
+    income: "4500.00",
+    expenses: "3250.25",
+    savings: "1249.75",
+  });
 
-  const upcomingBills = [
+  // Bills data
+  const [upcomingBills, setUpcomingBills] = useState([
     {
       id: 1,
       name: "Mortgage",
@@ -43,9 +62,10 @@ export default function DashboardPage() {
       dueDate: "2025-04-05",
       isPaid: false,
     },
-  ];
+  ]);
 
-  const recentTransactions = [
+  // Transactions data
+  const [recentTransactions, setRecentTransactions] = useState([
     {
       id: 1,
       description: "Grocery Store",
@@ -74,9 +94,10 @@ export default function DashboardPage() {
       date: "2025-03-18",
       category: "Entertainment",
     },
-  ];
+  ]);
 
-  const savingsGoals = [
+  // Goals data
+  const [savingsGoals, setSavingsGoals] = useState([
     {
       id: 1,
       name: "Vacation",
@@ -91,7 +112,40 @@ export default function DashboardPage() {
       current: 4500,
       deadline: "2026-01-30",
     },
-  ];
+  ]);
+  
+  // Handle editing of financial summary data
+  const startEditing = (field: keyof typeof editing) => {
+    setEditing({...editing, [field]: true});
+    setTempValues({
+      ...tempValues, 
+      [field]: summaryData[field].toString()
+    });
+  };
+  
+  const saveEdit = (field: keyof typeof editing) => {
+    try {
+      const value = parseFloat(tempValues[field]);
+      if (isNaN(value)) {
+        throw new Error("Please enter a valid number");
+      }
+      
+      // Update the data
+      setSummaryData({
+        ...summaryData,
+        [field]: parseFloat(value.toFixed(2))
+      });
+      
+      setEditing({...editing, [field]: false});
+      toast.success(`Updated ${field} to $${value.toFixed(2)}`);
+    } catch (error) {
+      toast.error("Please enter a valid number");
+    }
+  };
+  
+  const cancelEdit = (field: keyof typeof editing) => {
+    setEditing({...editing, [field]: false});
+  };
 
   return (
     <ProtectedRoute>
@@ -114,6 +168,13 @@ export default function DashboardPage() {
               <DashboardCustomize />
             </div>
           </div>
+          
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mb-2">
+            <h3 className="font-medium">Demo Mode Active</h3>
+            <p className="text-sm mt-1">
+              You can edit any value by clicking the edit icon next to it.
+            </p>
+          </div>
 
           <Tabs defaultValue="overview" className="space-y-4">
             <TabsList>
@@ -127,10 +188,42 @@ export default function DashboardPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
-                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center">
+                      <CircleDollarSign className="h-4 w-4 text-muted-foreground mr-2" />
+                      {!editing.balance ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => startEditing('balance')}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => saveEdit('balance')}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${summaryData.balance.toFixed(2)}</div>
+                    {!editing.balance ? (
+                      <div className="text-2xl font-bold">${summaryData.balance.toFixed(2)}</div>
+                    ) : (
+                      <Input 
+                        value={tempValues.balance}
+                        onChange={(e) => setTempValues({...tempValues, balance: e.target.value})}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit('balance')}
+                        onBlur={() => cancelEdit('balance')}
+                        className="text-xl font-bold"
+                        autoFocus
+                      />
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Across all accounts
                     </p>
@@ -139,10 +232,42 @@ export default function DashboardPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Income</CardTitle>
-                    <ArrowUp className="h-4 w-4 text-emerald-500" />
+                    <div className="flex items-center">
+                      <ArrowUp className="h-4 w-4 text-emerald-500 mr-2" />
+                      {!editing.income ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => startEditing('income')}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => saveEdit('income')}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${summaryData.income.toFixed(2)}</div>
+                    {!editing.income ? (
+                      <div className="text-2xl font-bold">${summaryData.income.toFixed(2)}</div>
+                    ) : (
+                      <Input 
+                        value={tempValues.income}
+                        onChange={(e) => setTempValues({...tempValues, income: e.target.value})}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit('income')}
+                        onBlur={() => cancelEdit('income')}
+                        className="text-xl font-bold"
+                        autoFocus
+                      />
+                    )}
                     <p className="text-xs text-muted-foreground">
                       This month
                     </p>
@@ -151,10 +276,42 @@ export default function DashboardPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Expenses</CardTitle>
-                    <ArrowDown className="h-4 w-4 text-rose-500" />
+                    <div className="flex items-center">
+                      <ArrowDown className="h-4 w-4 text-rose-500 mr-2" />
+                      {!editing.expenses ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => startEditing('expenses')}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => saveEdit('expenses')}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${summaryData.expenses.toFixed(2)}</div>
+                    {!editing.expenses ? (
+                      <div className="text-2xl font-bold">${summaryData.expenses.toFixed(2)}</div>
+                    ) : (
+                      <Input 
+                        value={tempValues.expenses}
+                        onChange={(e) => setTempValues({...tempValues, expenses: e.target.value})}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit('expenses')}
+                        onBlur={() => cancelEdit('expenses')}
+                        className="text-xl font-bold"
+                        autoFocus
+                      />
+                    )}
                     <p className="text-xs text-muted-foreground">
                       This month
                     </p>
@@ -163,10 +320,42 @@ export default function DashboardPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Savings</CardTitle>
-                    <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center">
+                      <PiggyBank className="h-4 w-4 text-muted-foreground mr-2" />
+                      {!editing.savings ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => startEditing('savings')}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6" 
+                          onClick={() => saveEdit('savings')}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">${summaryData.savings.toFixed(2)}</div>
+                    {!editing.savings ? (
+                      <div className="text-2xl font-bold">${summaryData.savings.toFixed(2)}</div>
+                    ) : (
+                      <Input 
+                        value={tempValues.savings}
+                        onChange={(e) => setTempValues({...tempValues, savings: e.target.value})}
+                        onKeyDown={(e) => e.key === 'Enter' && saveEdit('savings')}
+                        onBlur={() => cancelEdit('savings')}
+                        className="text-xl font-bold"
+                        autoFocus
+                      />
+                    )}
                     <p className="text-xs text-muted-foreground">
                       This month
                     </p>

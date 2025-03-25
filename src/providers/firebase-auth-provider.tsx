@@ -1,57 +1,54 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase-client';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { User, mapFirebaseUser } from '@/types/user';
+import { createContext, useContext, useState } from 'react';
+
+// Demo user type
+export type User = {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string | null;
+};
+
+// Create a demo user
+const DEMO_USER: User = {
+  id: 'demo-user-123',
+  uid: 'demo-user-123',
+  email: 'demo@example.com',
+  displayName: 'Demo User',
+  photoURL: null
+};
 
 interface AuthContextType {
-  user: User | null;
+  user: User;
   loading: boolean;
+  updateUserInfo: (userInfo: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true
+  user: DEMO_USER,
+  loading: false,
+  updateUserInfo: () => {}
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Always use the demo user
+  const [user, setUser] = useState<User>(DEMO_USER);
+  const [loading, setLoading] = useState(false);
 
-  // Simple auth listener
-  useEffect(() => {
-    // Skip if no window (SSR) or no auth
-    if (typeof window === 'undefined' || !auth) {
-      setLoading(false);
-      return;
-    }
-    
-    // Set up Firebase auth state listener
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (authUser) => {
-        if (authUser) {
-          // User is signed in
-          setUser(mapFirebaseUser(authUser));
-        } else {
-          // User is signed out
-          setUser(null);
-        }
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Auth state change error:", error);
-        setLoading(false);
-      }
-    );
+  // Function to update demo user information
+  const updateUserInfo = (userInfo: Partial<User>) => {
+    setUser(prev => ({
+      ...prev,
+      ...userInfo
+    }));
+  };
 
-    // Cleanup
-    return unsubscribe;
-  }, []);
+  console.log("Demo mode active - using demo user:", user.displayName);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, updateUserInfo }}>
       {children}
     </AuthContext.Provider>
   );
