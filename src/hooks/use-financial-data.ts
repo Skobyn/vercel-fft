@@ -69,6 +69,39 @@ export function useFinancialProfile() {
     }
   }, [user, profile]);
 
+  const updateFinancialBalance = async (newBalance: number, reason: string = 'Manual update') => {
+    if (!user) {
+      console.error('Cannot update balance: No authenticated user');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Update the financial profile in Firestore
+      const updatedProfile = await FinancialService.updateBalance(user.uid, newBalance, reason);
+      
+      // Update local state with the new data
+      if (profile) {
+        setProfile({
+          ...profile,
+          currentBalance: updatedProfile.currentBalance,
+          lastUpdated: updatedProfile.lastUpdated,
+          hasCompletedSetup: true
+        });
+      } else {
+        setProfile(updatedProfile);
+      }
+      
+      return updatedProfile;
+    } catch (error) {
+      console.error('Error updating financial balance:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
@@ -78,6 +111,7 @@ export function useFinancialProfile() {
     loading,
     error,
     updateBalance,
+    updateFinancialBalance,
     refetch: fetchProfile
   };
 }
@@ -635,6 +669,9 @@ export function useFinancialData() {
     budgets,
     goals,
     loading,
-    refetchAll
+    refetchAll,
+    updateFinancialBalance: profile.updateFinancialBalance,
+    addIncome: incomes.addIncome,
+    addExpense: expenses.addExpense
   };
 } 

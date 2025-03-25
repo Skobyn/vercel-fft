@@ -82,6 +82,7 @@ export const updateBalance = async (
     const updatedProfile: Partial<FinancialProfile> = {
       currentBalance: newBalance,
       lastUpdated: new Date().toISOString(),
+      hasCompletedSetup: true // Mark that setup has begun
     };
     
     await updateDoc(profileRef, updatedProfile);
@@ -119,7 +120,7 @@ export const addIncome = async (income: Omit<Income, 'id' | 'userId' | 'createdA
       updatedAt: now,
     };
     
-    const docRef = await addDoc(collection(db, 'incomes'), newIncome);
+    const docRef = await addDoc(collection(db, `users/${userId}/incomes`), newIncome);
     return { id: docRef.id, ...newIncome };
   } catch (error) {
     console.error('Error adding income:', error);
@@ -130,12 +131,12 @@ export const addIncome = async (income: Omit<Income, 'id' | 'userId' | 'createdA
 export const updateIncome = async (income: Partial<Income> & { id: string }, userId: string): Promise<void> => {
   try {
     const { id, ...data } = income;
-    const incomeRef = doc(db, 'incomes', id);
+    const incomeRef = doc(db, `users/${userId}/incomes`, id);
     
-    // Verify ownership
+    // Verify existence
     const incomeSnap = await getDoc(incomeRef);
-    if (!incomeSnap.exists() || incomeSnap.data().userId !== userId) {
-      throw new Error('Income not found or unauthorized');
+    if (!incomeSnap.exists()) {
+      throw new Error('Income not found');
     }
     
     const updatedData = {
@@ -152,12 +153,12 @@ export const updateIncome = async (income: Partial<Income> & { id: string }, use
 
 export const deleteIncome = async (id: string, userId: string): Promise<void> => {
   try {
-    const incomeRef = doc(db, 'incomes', id);
+    const incomeRef = doc(db, `users/${userId}/incomes`, id);
     
-    // Verify ownership
+    // Verify existence
     const incomeSnap = await getDoc(incomeRef);
-    if (!incomeSnap.exists() || incomeSnap.data().userId !== userId) {
-      throw new Error('Income not found or unauthorized');
+    if (!incomeSnap.exists()) {
+      throw new Error('Income not found');
     }
     
     await deleteDoc(incomeRef);
@@ -170,8 +171,7 @@ export const deleteIncome = async (id: string, userId: string): Promise<void> =>
 export const getIncomes = async (userId: string): Promise<Income[]> => {
   try {
     const incomesQuery = query(
-      collection(db, 'incomes'),
-      where('userId', '==', userId),
+      collection(db, `users/${userId}/incomes`),
       orderBy('date', 'desc')
     );
     
@@ -179,6 +179,12 @@ export const getIncomes = async (userId: string): Promise<Income[]> => {
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
   } catch (error) {
     console.error('Error getting incomes:', error);
+    
+    // Return empty array if collection doesn't exist yet
+    if ((error as any)?.code === 'resource-exhausted') {
+      return [];
+    }
+    
     throw error;
   }
 };
@@ -540,4 +546,104 @@ export const getGoals = async (userId: string): Promise<Goal[]> => {
     console.error('Error getting goals:', error);
     throw error;
   }
-}; 
+};
+
+// Add a new income record
+export const addIncomeRecord = async (
+  userId: string,
+  incomeData: { name: string; amount: number; frequency: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually' }
+): Promise<Income> => {
+  try {
+    // Create the income data object
+    const now = new Date().toISOString();
+    const newIncome: Omit<Income, 'id'> = {
+      userId,
+      name: incomeData.name,
+      amount: incomeData.amount,
+      frequency: incomeData.frequency,
+      date: now,
+      category: 'Other', // Default category
+      isRecurring: incomeData.frequency !== 'once',
+      nextDate: incomeData.frequency !== 'once' ? calculateNextPaymentDate(now, incomeData.frequency) : undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    // Add to Firestore
+    const docRef = await addDoc(collection(db, 'incomes'), newIncome);
+    
+    // Return the complete income object with id
+    return {
+      id: docRef.id,
+      ...newIncome
+    };
+  } catch (error) {
+    console.error('Error adding income record:', error);
+    throw error;
+  }
+};
+
+// Add a new expense record
+export const addExpenseRecord = async (
+  userId: string,
+  expenseData: { name: string; amount: number; category: string; frequency: string }
+): Promise<Expense> => {
+  try {
+    // Create the expense data object
+    const now = new Date().toISOString();
+    const newExpense: Omit<Expense, 'id'> = {
+      userId,
+      name: expenseData.name,
+      amount: expenseData.amount,
+      category: expenseData.category,
+      date: now,
+      isPlanned: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    // Add to Firestore
+    const docRef = await addDoc(collection(db, 'expenses'), newExpense);
+    
+    // Return the complete expense object with id
+    return {
+      id: docRef.id,
+      ...newExpense
+    };
+  } catch (error) {
+    console.error('Error adding expense record:', error);
+    throw error;
+  }
+};
+
+// Helper function to calculate the next payment date based on frequency
+function calculateNextPaymentDate(fromDate: string, frequency: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually'): string {
+  const date = new Date(fromDate);
+  
+  switch (frequency.toLowerCase()) {
+    case 'daily':
+      date.setDate(date.getDate() + 1);
+      break;
+    case 'weekly':
+      date.setDate(date.getDate() + 7);
+      break;
+    case 'biweekly':
+      date.setDate(date.getDate() + 14);
+      break;
+    case 'monthly':
+      date.setMonth(date.getMonth() + 1);
+      break;
+    case 'quarterly':
+      date.setMonth(date.getMonth() + 3);
+      break;
+    case 'annually':
+    case 'yearly':
+      date.setFullYear(date.getFullYear() + 1);
+      break;
+    default:
+      // For 'once' or any other value, don't set a next date
+      return '';
+  }
+  
+  return date.toISOString();
+} 

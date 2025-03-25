@@ -107,13 +107,12 @@ export default function DashboardPage() {
   };
 
   // Function to handle balance update
-  const handleUpdateBalance = async (newBalance: number) => {
-    if (!user) return;
-    
+  const handleUpdateBalance = async (amount: number) => {
     try {
-      await updateBalance(newBalance, "Manual update from dashboard");
-      toast.success("Balance updated successfully");
-      setShowBalanceModal(false);
+      await updateBalance(amount, "Initial setup");
+      toast.success(`Balance updated to $${amount.toFixed(2)}`);
+      // Mark that setup has begun but don't close the guide
+      // Allow the user to continue with the next steps
     } catch (error) {
       console.error("Error updating balance:", error);
       toast.error("Failed to update balance");
@@ -177,12 +176,9 @@ export default function DashboardPage() {
                 Close Setup Guide
               </Button>
             </div>
-            <SetupGuide 
-              onClose={() => setShowSetupGuide(false)} 
-              onSetBalance={(amount: number) => {
-                handleUpdateBalance(amount);
-                setShowSetupGuide(false);
-              }}
+            <SetupGuide
+              onClose={() => setShowSetupGuide(false)}
+              onSetBalance={handleUpdateBalance}
             />
           </div>
         ) : (
