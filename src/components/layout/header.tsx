@@ -17,13 +17,26 @@ import { useAuth } from "@/providers/firebase-auth-provider";
 import { toast } from "sonner";
 
 export function Header() {
-  const { user, updateUserInfo } = useAuth();
+  const { user, demoMode, signOut, updateUserInfo } = useAuth();
 
   const handleChangeName = () => {
-    const newName = prompt("Enter a new display name:", user.displayName);
-    if (newName && newName.trim() !== "") {
-      updateUserInfo({ displayName: newName.trim() });
-      toast.success(`Name updated to: ${newName.trim()}`);
+    if (!user) return;
+    
+    const newName = prompt("Enter your new display name:", user.displayName);
+    if (newName && newName !== user.displayName) {
+      updateUserInfo({ displayName: newName })
+        .catch(error => {
+          console.error("Error updating name:", error);
+          toast.error("Failed to update display name");
+        });
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
@@ -36,23 +49,25 @@ export function Header() {
         </Link>
         <MainNav />
         <div className="ml-auto flex items-center">
-          <div className="mr-4 text-sm px-3 py-1 bg-amber-100 text-amber-800 rounded-md">
-            Demo Mode
-          </div>
+          {demoMode && (
+            <div className="mr-4 text-sm px-3 py-1 bg-amber-100 text-amber-800 rounded-md">
+              Demo Mode
+            </div>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback>{user.displayName[0] || "D"}</AvatarFallback>
+                  <AvatarFallback>{user?.displayName?.[0] || "U"}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                  <p className="text-sm font-medium leading-none">{user?.displayName || "Guest"}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user.email}
+                    {user?.email || "No email"}
                   </p>
                 </div>
               </DropdownMenuLabel>
@@ -64,9 +79,15 @@ export function Header() {
                 Change Display Name
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => toast.info("This is demo mode - no sign out needed!")}>
-                Demo Mode Info
-              </DropdownMenuItem>
+              {demoMode ? (
+                <DropdownMenuItem onClick={() => toast.info("This is demo mode - no sign out needed!")}>
+                  Demo Mode Info
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign Out
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

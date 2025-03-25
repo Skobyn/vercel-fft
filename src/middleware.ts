@@ -3,21 +3,24 @@ import type { NextRequest } from 'next/server';
 
 // Middleware to handle auth redirects
 export async function middleware(request: NextRequest) {
-  // In demo mode, we don't need any redirects - all routes are accessible
-  // Just pass through all requests
-  return NextResponse.next();
-
-  /* Original authentication logic - disabled for demo mode
   // Get the pathname of the request
   const path = request.nextUrl.pathname;
 
   // Define public paths that don't require authentication
   const isPublicPath = path.startsWith('/auth/') || 
-                      path === '/' || 
-                      path.startsWith('/api/');
+                       path === '/' || 
+                       path.startsWith('/api/') ||
+                       path.startsWith('/_next/') ||
+                       path.includes('favicon.ico');
 
   // Get the token from the session cookie
-  const token = request.cookies.get('session')?.value;
+  const token = request.cookies.get('firebase-auth-token')?.value;
+  const demoMode = request.cookies.get('demo-mode')?.value === 'true';
+
+  // In demo mode, allow access to all routes
+  if (demoMode) {
+    return NextResponse.next();
+  }
 
   // Redirect unauthenticated users to signin page
   if (!token && !isPublicPath) {
@@ -30,12 +33,11 @@ export async function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-  */
 }
 
 // Configure paths that should be protected
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

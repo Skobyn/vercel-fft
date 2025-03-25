@@ -40,16 +40,21 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <a href="/dashboard">
-                    <Button size="lg" className="w-full">Enter Demo</Button>
+                  <a href="/auth/signup">
+                    <Button size="lg" className="w-full">Create Account</Button>
                   </a>
+                  <a href="/auth/signin">
+                    <Button size="lg" variant="outline" className="w-full">Sign In</Button>
+                  </a>
+                </div>
+                <div className="flex flex-col gap-2 mt-2">
                   <a href="/dashboard">
-                    <Button size="lg" variant="outline" className="w-full">Explore Features</Button>
+                    <Button variant="link" className="w-full">Try Demo Mode</Button>
                   </a>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-3 mt-4">
                   <p className="text-sm">
-                    <strong>Demo Mode Active:</strong> All features are available without authentication.
+                    <strong>Get Started:</strong> Create an account to manage your finances or try our demo mode.
                   </p>
                 </div>
               </div>
