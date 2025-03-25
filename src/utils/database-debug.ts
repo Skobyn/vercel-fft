@@ -1,7 +1,7 @@
 "use client";
 
 import { db } from '@/lib/firebase-client';
-import { doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, query, where, getDoc } from 'firebase/firestore';
 import { FinancialProfile } from '@/types/financial';
 
 /**
@@ -12,8 +12,7 @@ import { FinancialProfile } from '@/types/financial';
  */
 export async function initializeCollections(userId: string): Promise<void> {
   if (!userId) {
-    console.error('User ID is required');
-    return;
+    throw new Error('User ID is required');
   }
 
   console.log(`Initializing collections for user: ${userId}`);
@@ -21,18 +20,29 @@ export async function initializeCollections(userId: string): Promise<void> {
   try {
     // Create financial profile
     const profileRef = doc(db, 'financialProfiles', userId);
+    const profileSnap = await getDoc(profileRef);
     
-    // Create default financial profile
-    const defaultProfile: FinancialProfile = {
-      userId,
-      currentBalance: 0,
-      lastUpdated: new Date().toISOString(),
-      currency: 'USD',
-      hasCompletedSetup: false
-    };
-    
-    await setDoc(profileRef, defaultProfile, { merge: true });
-    console.log("Financial profile initialized");
+    let defaultProfile: FinancialProfile;
+    if (!profileSnap.exists()) {
+      // Create default financial profile
+      defaultProfile = {
+        userId,
+        currentBalance: 0,
+        lastUpdated: new Date().toISOString(),
+        currency: 'USD',
+        hasCompletedSetup: false
+      };
+      
+      try {
+        await setDoc(profileRef, defaultProfile, { merge: true });
+        console.log("Financial profile initialized");
+      } catch (error) {
+        console.error("Error creating financial profile:", error);
+        throw new Error(`Failed to create financial profile: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      console.log("Financial profile already exists");
+    }
     
     // Create user collections
     const collections = [
@@ -45,18 +55,36 @@ export async function initializeCollections(userId: string): Promise<void> {
     ];
     
     // Create a placeholder document in each collection
+    const results = [];
     for (const col of collections) {
-      const placeholderRef = doc(db, col.path, '_metadata');
-      await setDoc(placeholderRef, { 
-        created: new Date().toISOString(),
-        note: 'This document ensures the collection exists'
-      }, { merge: true });
-      console.log(`Initialized collection: ${col.name}`);
+      try {
+        const placeholderRef = doc(db, col.path, '_metadata');
+        await setDoc(placeholderRef, { 
+          created: new Date().toISOString(),
+          note: 'This document ensures the collection exists'
+        }, { merge: true });
+        console.log(`Initialized collection: ${col.name}`);
+        results.push({ collection: col.name, success: true });
+      } catch (error) {
+        console.error(`Error initializing collection ${col.name}:`, error);
+        results.push({ 
+          collection: col.name, 
+          success: false, 
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
+    // Check if we had any failures
+    const failures = results.filter(r => !r.success);
+    if (failures.length > 0) {
+      throw new Error(`Failed to initialize ${failures.length} collections. This is likely due to Firebase permissions issues. Make sure your security rules allow writes to these collections.`);
     }
     
     console.log("All collections successfully initialized");
   } catch (error) {
     console.error("Error initializing collections:", error);
+    throw error;
   }
 }
 

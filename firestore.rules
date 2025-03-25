@@ -1,25 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // TEMPORARY DEVELOPMENT RULES - CHANGE BEFORE PRODUCTION
+    // Allow authenticated users to read and write all documents
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    /* PRODUCTION RULES - UNCOMMENT THESE BEFORE GOING LIVE
     // Allow users to read and write their own financial profile
     match /financialProfiles/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
     // Allow users to read and write to their own sub-collections
-    match /users/{userId}/{document=**} {
+    match /users/{userId}/{collection}/{docId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Allow access to balance adjustments
-    match /balanceAdjustments/{docId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+    // Legacy collections - these may contain data before user-specific paths were implemented
+    match /incomes/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
-    // Default deny
+    match /bills/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    match /expenses/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    match /budgets/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    match /goals/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    match /balanceAdjustments/{docId} {
+      allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }
+    */
   }
 } 

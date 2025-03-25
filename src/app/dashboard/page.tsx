@@ -18,6 +18,7 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase-client";
 import { toast } from "sonner";
 import { initializeCollections } from '@/utils/database-debug';
+import { DebugPanel } from "@/components/dashboard/debug-panel";
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -182,27 +183,18 @@ export default function DashboardPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Financial Dashboard</h1>
           
-          {process.env.NODE_ENV !== 'production' && (
+          {process.env.NODE_ENV !== 'production' && user && (
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                if (user) {
-                  try {
-                    toast.loading("Initializing collections...");
-                    await initializeCollections(user.uid);
-                    toast.success("Collections initialized successfully! Refreshing...");
-                    setTimeout(() => window.location.reload(), 1500);
-                  } catch (error) {
-                    console.error("Error initializing collections:", error);
-                    toast.error("Failed to initialize collections");
-                  }
-                } else {
-                  toast.error("User not authenticated");
+              onClick={() => {
+                const debugSection = document.getElementById('debug-section');
+                if (debugSection) {
+                  debugSection.scrollIntoView({ behavior: 'smooth' });
                 }
               }}
             >
-              Debug: Initialize Collections
+              Debug Tools
             </Button>
           )}
         </div>
@@ -253,6 +245,12 @@ export default function DashboardPage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
+            
+            {process.env.NODE_ENV !== 'production' && user && (
+              <div id="debug-section">
+                <DebugPanel userId={user.uid} />
+              </div>
+            )}
           </>
         )}
       </div>
