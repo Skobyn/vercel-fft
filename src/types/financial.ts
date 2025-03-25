@@ -72,10 +72,16 @@ export interface BalanceAdjustment extends BaseItem {
 
 // Cash flow forecast item
 export interface ForecastItem {
-  id: string;
+  id?: string;
+  itemId?: string;
   date: string;
-  balance: number;
-  transactions: {
+  balance?: number;
+  amount: number;
+  category: string;
+  name: string;
+  type: 'income' | 'bill' | 'expense' | 'balance' | 'adjustment';
+  runningBalance?: number;
+  transactions?: {
     id: string;
     type: 'income' | 'bill' | 'expense';
     amount: number;

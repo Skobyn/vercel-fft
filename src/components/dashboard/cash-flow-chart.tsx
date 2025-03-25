@@ -117,6 +117,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     amount: item.amount,
     name: item.name,
     fullDate: item.date,
+    runningBalance: item.runningBalance || 0
   }));
 
   return (
