@@ -13,13 +13,17 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
 import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
 import { ArrowRight, X } from "lucide-react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase-client";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
-  const { user, loading, demoMode } = useAuth();
-  const { profile, loading: profileLoading } = useFinancialProfile();
+  const { user, loading } = useAuth();
+  const { profile, loading: profileLoading, updateBalance } = useFinancialProfile();
   const { incomes, loading: incomesLoading, error: incomesError, updateIncome, deleteIncome } = useIncomes();
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
 
@@ -48,6 +52,9 @@ export default function DashboardPage() {
         // Clear redirect loop blocker if user is authenticated
         sessionStorage.removeItem("redirect_loop_blocker");
         setAuthChecked(true);
+        
+        // If the user is new or doesn't have their collections initialized, initialize them
+        initializeUserCollections(user.uid);
       }
     }
   }, [user, loading, router]);
@@ -65,6 +72,53 @@ export default function DashboardPage() {
       }
     }
   }, [user, profile, profileLoading]);
+
+  // Function to initialize necessary collections
+  const initializeUserCollections = async (userId: string) => {
+    if (!db) return;
+    
+    console.log("Ensuring collections are initialized for user:", userId);
+    
+    try {
+      // Create financial profile if it doesn't exist yet
+      const profileRef = doc(db, 'financialProfiles', userId);
+      
+      // Create empty collections if they don't exist
+      const collections = [
+        { name: 'incomes', path: `users/${userId}/incomes` },
+        { name: 'bills', path: `users/${userId}/bills` },
+        { name: 'expenses', path: `users/${userId}/expenses` },
+        { name: 'budgets', path: `users/${userId}/budgets` },
+        { name: 'goals', path: `users/${userId}/goals` }
+      ];
+      
+      // Create a placeholder document in each collection
+      for (const collection of collections) {
+        const placeholderRef = doc(db, collection.path, '_metadata');
+        await setDoc(placeholderRef, { 
+          created: new Date().toISOString(),
+          note: 'This document ensures the collection exists'
+        }, { merge: true });
+        console.log(`Initialized collection: ${collection.name}`);
+      }
+    } catch (error) {
+      console.error("Error initializing collections:", error);
+    }
+  };
+
+  // Function to handle balance update
+  const handleUpdateBalance = async (newBalance: number) => {
+    if (!user) return;
+    
+    try {
+      await updateBalance(newBalance, "Manual update from dashboard");
+      toast.success("Balance updated successfully");
+      setShowBalanceModal(false);
+    } catch (error) {
+      console.error("Error updating balance:", error);
+      toast.error("Failed to update balance");
+    }
+  };
 
   // Show loading state while checking authentication or loading profile
   if (loading || (!authChecked && !user)) {
@@ -110,23 +164,6 @@ export default function DashboardPage() {
       <div className="p-4 md:p-6">
         <h1 className="text-3xl font-bold mb-6">Financial Dashboard</h1>
         
-        {demoMode && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <h2 className="font-semibold text-amber-800 mb-2">Demo Mode Active</h2>
-            <p className="text-amber-700 mb-3">
-              You&apos;re currently using the demo mode. Your data won&apos;t be saved
-              between sessions.
-            </p>
-            <Button
-              variant="outline"
-              className="bg-white border-amber-300 text-amber-700 hover:bg-amber-100"
-              onClick={() => router.push("/auth/signup")}
-            >
-              Create an Account
-            </Button>
-          </div>
-        )}
-
         {showSetupGuide ? (
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
@@ -140,12 +177,18 @@ export default function DashboardPage() {
                 Close Setup Guide
               </Button>
             </div>
-            <SetupGuide onClose={() => setShowSetupGuide(false)} />
+            <SetupGuide 
+              onClose={() => setShowSetupGuide(false)} 
+              onSetBalance={(amount: number) => {
+                handleUpdateBalance(amount);
+                setShowSetupGuide(false);
+              }}
+            />
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <BalanceCard />
+              <BalanceCard onUpdateBalance={handleUpdateBalance} />
               <CashFlowChart />
             </div>
 

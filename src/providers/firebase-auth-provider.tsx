@@ -16,19 +16,9 @@ export type User = {
   photoURL?: string | null;
 };
 
-// Fallback demo user (used only when auth fails)
-const DEMO_USER: User = {
-  id: 'demo-user-123',
-  uid: 'demo-user-123',
-  email: 'demo@example.com',
-  displayName: 'Demo User',
-  photoURL: null
-};
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  demoMode: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
@@ -48,7 +38,6 @@ const mapFirebaseUser = (firebaseUser: FirebaseUser): User => ({
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  demoMode: false,
   signIn: async () => {},
   signInWithGoogle: async () => {},
   signUp: async () => {},
@@ -104,7 +93,6 @@ const initializeUserCollections = async (firebaseUser: FirebaseUser) => {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [demoMode, setDemoMode] = useState(false);
   const router = useRouter();
 
   // Listen for auth state changes
@@ -159,7 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (firebaseUser) {
             const userProfile = await loadUserProfile(firebaseUser);
             setUser(userProfile);
-            setDemoMode(false);
             console.log("User authenticated:", userProfile.displayName);
             
             // Check if we need to redirect to dashboard
@@ -180,7 +167,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error) {
           console.error("Auth error:", error);
-          // Fallback to demo mode in case of auth errors
           setUser(null);
         } finally {
           setLoading(false);
@@ -380,19 +366,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Enable demo mode
-  const enableDemoMode = () => {
-    setUser(DEMO_USER);
-    setDemoMode(true);
-    toast.info('Demo mode activated');
-  };
-
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
-        demoMode,
         signIn,
         signInWithGoogle,
         signUp,

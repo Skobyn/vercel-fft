@@ -388,17 +388,17 @@ export const getExpenses = async (userId: string): Promise<Expense[]> => {
 };
 
 // BUDGET OPERATIONS
-export const addBudget = async (budget: Omit<Budget, 'id' | 'userId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<Budget> => {
+export const addBudget = async (budget: any, userId: string): Promise<any> => {
   try {
     const now = new Date().toISOString();
-    const newBudget: Omit<Budget, 'id'> = {
+    const newBudget = {
       ...budget,
       userId,
       createdAt: now,
       updatedAt: now,
     };
     
-    const docRef = await addDoc(collection(db, 'budgets'), newBudget);
+    const docRef = await addDoc(collection(db, `users/${userId}/budgets`), newBudget);
     return { id: docRef.id, ...newBudget };
   } catch (error) {
     console.error('Error adding budget:', error);
@@ -406,15 +406,15 @@ export const addBudget = async (budget: Omit<Budget, 'id' | 'userId' | 'createdA
   }
 };
 
-export const updateBudget = async (budget: Partial<Budget> & { id: string }, userId: string): Promise<void> => {
+export const updateBudget = async (budget: any & { id: string }, userId: string): Promise<void> => {
   try {
     const { id, ...data } = budget;
-    const budgetRef = doc(db, 'budgets', id);
+    const budgetRef = doc(db, `users/${userId}/budgets`, id);
     
     // Verify ownership
     const budgetSnap = await getDoc(budgetRef);
-    if (!budgetSnap.exists() || budgetSnap.data().userId !== userId) {
-      throw new Error('Budget not found or unauthorized');
+    if (!budgetSnap.exists()) {
+      throw new Error('Budget not found');
     }
     
     const updatedData = {
@@ -431,12 +431,12 @@ export const updateBudget = async (budget: Partial<Budget> & { id: string }, use
 
 export const deleteBudget = async (id: string, userId: string): Promise<void> => {
   try {
-    const budgetRef = doc(db, 'budgets', id);
+    const budgetRef = doc(db, `users/${userId}/budgets`, id);
     
-    // Verify ownership
+    // Verify existence
     const budgetSnap = await getDoc(budgetRef);
-    if (!budgetSnap.exists() || budgetSnap.data().userId !== userId) {
-      throw new Error('Budget not found or unauthorized');
+    if (!budgetSnap.exists()) {
+      throw new Error('Budget not found');
     }
     
     await deleteDoc(budgetRef);
@@ -446,18 +446,23 @@ export const deleteBudget = async (id: string, userId: string): Promise<void> =>
   }
 };
 
-export const getBudgets = async (userId: string): Promise<Budget[]> => {
+export const getBudgets = async (userId: string): Promise<any[]> => {
   try {
     const budgetsQuery = query(
-      collection(db, 'budgets'),
-      where('userId', '==', userId),
-      orderBy('startDate', 'desc')
+      collection(db, `users/${userId}/budgets`),
+      orderBy('createdAt', 'desc')
     );
     
     const querySnapshot = await getDocs(budgetsQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Error getting budgets:', error);
+    
+    // Return empty array if collection doesn't exist yet
+    if ((error as any)?.code === 'resource-exhausted') {
+      return [];
+    }
+    
     throw error;
   }
 };

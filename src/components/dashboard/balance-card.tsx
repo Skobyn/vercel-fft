@@ -24,7 +24,11 @@ import BalanceForm from "@/components/forms/balance-form";
 import { useFinancialProfile } from "@/hooks/use-financial-data";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-export function BalanceCard() {
+interface BalanceCardProps {
+  onUpdateBalance?: (amount: number) => Promise<void>;
+}
+
+export function BalanceCard({ onUpdateBalance }: BalanceCardProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { profile, updateBalance, loading, error } = useFinancialProfile();
@@ -32,7 +36,13 @@ export function BalanceCard() {
   const handleUpdateBalance = async (values: { newBalance: number; reason: string }) => {
     try {
       setIsSubmitting(true);
-      await updateBalance(values.newBalance, values.reason);
+      
+      if (onUpdateBalance) {
+        await onUpdateBalance(values.newBalance);
+      } else {
+        await updateBalance(values.newBalance, values.reason);
+      }
+      
       setOpen(false);
     } catch (error) {
       console.error("Failed to update balance:", error);

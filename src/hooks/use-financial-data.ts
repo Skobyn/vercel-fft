@@ -405,7 +405,7 @@ export function useExpenses() {
 
 export function useBudgets() {
   const { user } = useAuth();
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -418,6 +418,8 @@ export function useBudgets() {
 
     try {
       setLoading(true);
+      // In a real app, this would fetch from Firebase
+      // Placeholder data for now
       const data = await FinancialService.getBudgets(user.uid);
       setBudgets(data);
       setError(null);
@@ -430,7 +432,7 @@ export function useBudgets() {
     }
   }, [user]);
 
-  const addBudget = useCallback(async (budget: Omit<Budget, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+  const addBudget = useCallback(async (budget: any) => {
     if (!user) {
       toast.error('You must be logged in to add a budget');
       return;
@@ -448,7 +450,7 @@ export function useBudgets() {
     }
   }, [user]);
 
-  const updateBudget = useCallback(async (budget: Partial<Budget> & { id: string }) => {
+  const updateBudget = useCallback(async (budget: any) => {
     if (!user) {
       toast.error('You must be logged in to update a budget');
       return;
