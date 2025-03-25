@@ -30,6 +30,7 @@ interface AuthContextType {
   loading: boolean;
   demoMode: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserInfo: (userInfo: Partial<User>) => Promise<void>;
@@ -49,6 +50,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   demoMode: false,
   signIn: async () => {},
+  signInWithGoogle: async () => {},
   signUp: async () => {},
   signOut: async () => {},
   updateUserInfo: async () => {}
@@ -116,7 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const justSignedIn = sessionStorage.getItem('just_signed_in');
             if (justSignedIn === 'true') {
               sessionStorage.removeItem('just_signed_in');
-              router.push('/dashboard');
+              // Force immediate navigation
+              window.location.href = '/dashboard';
             }
           } else {
             setUser(null);
@@ -155,6 +158,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error('Sign in error:', error);
       toast.error(error.message || 'Failed to sign in');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign in with Google
+  const signInWithGoogle = async () => {
+    try {
+      setLoading(true);
+      if (!auth) throw new Error('Firebase auth not initialized');
+      
+      const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+      const provider = new GoogleAuthProvider();
+      
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Check if user document exists, create if not
+      if (db) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (!userDoc.exists()) {
+          await setDoc(userDocRef, {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+      
+      // Set flag that we just signed in to trigger redirect in auth state listener
+      sessionStorage.setItem('just_signed_in', 'true');
+      
+      toast.success('Signed in with Google successfully');
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      // Handle specific Google sign-in errors
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast.error('Sign-in cancelled. Please try again.');
+      } else {
+        toast.error(error.message || 'Failed to sign in with Google');
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -262,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         demoMode,
         signIn,
+        signInWithGoogle,
         signUp,
         signOut,
         updateUserInfo
