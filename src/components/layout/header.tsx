@@ -17,7 +17,7 @@ import { useAuth } from "@/providers/firebase-auth-provider";
 import { toast } from "sonner";
 
 export function Header() {
-  const { user, demoMode, signOut, updateUserInfo } = useAuth();
+  const { user, signOut, updateUserInfo } = useAuth();
 
   const handleChangeName = () => {
     if (!user) return;
@@ -49,11 +49,6 @@ export function Header() {
         </Link>
         <MainNav />
         <div className="ml-auto flex items-center">
-          {demoMode && (
-            <div className="mr-4 text-sm px-3 py-1 bg-amber-100 text-amber-800 rounded-md">
-              Demo Mode
-            </div>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -62,7 +57,7 @@ export function Header() {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">{user?.displayName || "Guest"}</p>
@@ -79,15 +74,9 @@ export function Header() {
                 Change Display Name
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {demoMode ? (
-                <DropdownMenuItem onClick={() => toast.info("This is demo mode - no sign out needed!")}>
-                  Demo Mode Info
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={handleSignOut}>
-                  Sign Out
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={handleSignOut}>
+                Sign Out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

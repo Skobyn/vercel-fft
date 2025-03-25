@@ -47,14 +47,9 @@ export default function Home() {
                     <Button size="lg" variant="outline" className="w-full">Sign In</Button>
                   </a>
                 </div>
-                <div className="flex flex-col gap-2 mt-2">
-                  <a href="/dashboard">
-                    <Button variant="link" className="w-full">Try Demo Mode</Button>
-                  </a>
-                </div>
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-3 mt-4">
                   <p className="text-sm">
-                    <strong>Get Started:</strong> Create an account to manage your finances or try our demo mode.
+                    <strong>Get Started:</strong> Create an account to manage your finances and take control of your spending.
                   </p>
                 </div>
               </div>

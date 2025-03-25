@@ -93,13 +93,6 @@ export default function SignUpPage() {
     }
   };
 
-  // Handle demo mode
-  const handleDemoMode = () => {
-    document.cookie = "demo-mode=true; path=/";
-    toast.success("Demo mode activated");
-    router.push("/dashboard");
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -247,12 +240,6 @@ export default function SignUpPage() {
               </svg>
               Sign Up with Google
             </Button>
-            
-            <div className="mt-4">
-              <Button variant="outline" className="w-full" onClick={handleDemoMode}>
-                Enter Demo Mode
-              </Button>
-            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <div className="text-sm text-center">

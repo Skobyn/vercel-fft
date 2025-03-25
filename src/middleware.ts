@@ -15,12 +15,6 @@ export async function middleware(request: NextRequest) {
 
   // Get the token from the session cookie
   const token = request.cookies.get('firebase-auth-token')?.value;
-  const demoMode = request.cookies.get('demo-mode')?.value === 'true';
-
-  // In demo mode, allow access to all routes
-  if (demoMode) {
-    return NextResponse.next();
-  }
 
   // Redirect unauthenticated users to signin page
   if (!token && !isPublicPath) {
