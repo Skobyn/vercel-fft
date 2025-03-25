@@ -2,16 +2,17 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function SignInPage() {
+  const router = useRouter();
+
   useEffect(() => {
     toast.success("Demo mode active - redirecting to dashboard");
     
-    // Redirect to dashboard immediately
-    setTimeout(() => {
-      window.location.href = "/dashboard";
-    }, 500);
-  }, []);
+    // Use Next.js router for client-side navigation
+    router.push("/dashboard");
+  }, [router]);
 
   return (
     <div className="container mx-auto max-w-md py-12">
