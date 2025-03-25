@@ -80,6 +80,24 @@ npm run dev
 
 The application uses Firestore as its database. See the `firestore/schema.md` file for details on the data model and collection structure.
 
+## Troubleshooting
+
+### Authentication Issues
+
+If you encounter authentication issues (like Error 400 during Google sign-in):
+
+1. Visit the debug page at [http://localhost:3000/auth/debug](http://localhost:3000/auth/debug)
+2. Check if all Firebase configuration variables are correctly set
+3. Verify that your testing domain is added to Firebase authorized domains
+4. See the `docs/FIREBASE_AUTH_TROUBLESHOOTING.md` for a comprehensive guide
+
+### Development Issues
+
+- Make sure all environment variables are set in your `.env.local` file
+- Clear browser cache and cookies if experiencing persistent issues
+- Check browser console for error messages
+- Verify that Firebase services (Auth, Firestore) are enabled in your Firebase project
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

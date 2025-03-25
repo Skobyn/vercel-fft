@@ -13,17 +13,42 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
 import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
 import { ArrowRight, X } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const { user, loading, demoMode } = useAuth();
   const { profile, loading: profileLoading } = useFinancialProfile();
   const { incomes, loading: incomesLoading, error: incomesError, updateIncome, deleteIncome } = useIncomes();
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
 
+  // Authentication check
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/signin");
+    console.log("Dashboard auth check - Loading:", loading, "User:", user ? "logged in" : "not logged in");
+    
+    // Wait for loading to complete before making decisions
+    if (!loading) {
+      if (!user) {
+        console.log("User not authenticated, redirecting to sign in");
+        
+        // Check if we're in a potential redirect loop
+        const redirectLoopBlocker = sessionStorage.getItem("redirect_loop_blocker");
+        if (redirectLoopBlocker === "true") {
+          console.log("Detected potential redirect loop, showing error instead of redirecting");
+          toast.error("Authentication issue detected. Please try signing in again.");
+          sessionStorage.removeItem("redirect_loop_blocker");
+        } else {
+          // Set redirect loop blocker and redirect
+          sessionStorage.setItem("redirect_loop_blocker", "true");
+          router.push("/auth/signin");
+        }
+      } else {
+        console.log("User authenticated:", user.displayName);
+        // Clear redirect loop blocker if user is authenticated
+        sessionStorage.removeItem("redirect_loop_blocker");
+        setAuthChecked(true);
+      }
     }
   }, [user, loading, router]);
 
@@ -41,18 +66,43 @@ export default function DashboardPage() {
     }
   }, [user, profile, profileLoading]);
 
-  if (loading || profileLoading || incomesLoading) {
+  // Show loading state while checking authentication or loading profile
+  if (loading || (!authChecked && !user)) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">
-          <LoadingSpinner size="lg" />
+          <LoadingSpinner size="lg" message="Verifying authentication..." />
         </div>
       </MainLayout>
     );
   }
 
+  // Show loading state while loading financial data
+  if (profileLoading || incomesLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <LoadingSpinner size="lg" message="Loading your financial data..." />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // This should never render due to the redirect in useEffect
   if (!user) {
-    return null; // This will redirect due to the useEffect above
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="text-center">
+            <h2 className="text-xl font-bold mb-4">Session expired</h2>
+            <p className="mb-4">Your session has expired or you are not logged in.</p>
+            <Button onClick={() => router.push("/auth/signin")}>
+              Go to Sign In
+            </Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
   }
 
   return (

@@ -39,7 +39,10 @@ export default function SignInPage() {
 
   // Redirect if already signed in
   useEffect(() => {
+    console.log("Sign-in page auth check - User:", user ? "logged in" : "not logged in");
+    
     if (user) {
+      console.log("User already authenticated, redirecting to dashboard");
       router.push("/dashboard");
     }
     
@@ -70,6 +73,7 @@ export default function SignInPage() {
       }
       
       // Set flag for redirection
+      console.log("Setting just_signed_in flag for redirection");
       sessionStorage.setItem("just_signed_in", "true");
       
       // The redirection will be handled by the auth provider

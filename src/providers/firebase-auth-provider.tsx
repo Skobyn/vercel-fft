@@ -117,9 +117,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Check if we need to redirect to dashboard
             const justSignedIn = sessionStorage.getItem('just_signed_in');
             if (justSignedIn === 'true') {
+              console.log("Just signed in flag detected, redirecting to dashboard");
               sessionStorage.removeItem('just_signed_in');
-              // Force immediate navigation
-              window.location.href = '/dashboard';
+              sessionStorage.removeItem('redirect_loop_blocker'); // Clear any redirect loop blockers
+              
+              // Use router for client-side navigation if we're not already on dashboard
+              if (window.location.pathname !== '/dashboard') {
+                router.push('/dashboard');
+              }
             }
           } else {
             setUser(null);
@@ -170,37 +175,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       if (!auth) throw new Error('Firebase auth not initialized');
       
-      const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+      // Add debug logging
+      console.log("Attempting Google sign-in...");
+      console.log("Auth domain:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+      
+      const { GoogleAuthProvider, signInWithPopup, signInWithRedirect } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
       
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      // Add scopes if needed
+      provider.addScope('email');
+      provider.addScope('profile');
       
-      // Check if user document exists, create if not
-      if (db) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
+      // Use PopUp for debugging (easier to see errors)
+      console.log("Opening Google auth popup...");
+      
+      try {
+        const result = await signInWithPopup(auth, provider);
+        console.log("Google sign-in successful", result);
+        const user = result.user;
         
-        if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
+        // Check if user document exists, create if not
+        if (db) {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+        
+        // Set flag that we just signed in to trigger redirect in auth state listener
+        sessionStorage.setItem('just_signed_in', 'true');
+        
+        toast.success('Signed in with Google successfully');
+      } catch (popupError: any) {
+        console.error("Popup error:", popupError);
+        console.log("Trying redirect method instead...");
+        
+        // If popup fails, try redirect method
+        if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupError;
         }
       }
-      
-      // Set flag that we just signed in to trigger redirect in auth state listener
-      sessionStorage.setItem('just_signed_in', 'true');
-      
-      toast.success('Signed in with Google successfully');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
       // Handle specific Google sign-in errors
       if (error.code === 'auth/popup-closed-by-user') {
         toast.error('Sign-in cancelled. Please try again.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        toast.error('This domain is not authorized for authentication. Please contact support.');
+        console.error('Unauthorized domain. Make sure your domain is added to the Firebase Auth providers.');
       } else {
         toast.error(error.message || 'Failed to sign in with Google');
       }

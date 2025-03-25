@@ -66,6 +66,11 @@ export default function SignUpPage() {
       await signUp(data.email, data.password, data.displayName);
       
       toast.success("Account created successfully");
+      
+      // Set session storage flag to indicate successful sign-up
+      sessionStorage.setItem("just_signed_in", "true");
+      
+      // Explicitly navigate to dashboard
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Sign up error:", error);
