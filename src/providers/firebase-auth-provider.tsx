@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const initialized = useRef(false);
+  const authCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize auth state
   useEffect(() => {
@@ -91,16 +92,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
+    // Ensure loading state is properly handled even if Firebase is slow
+    authCheckTimer.current = setTimeout(() => {
+      if (loading) {
+        console.log("Auth check timed out, assuming not authenticated");
+        setLoading(false);
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    }, 5000); // 5 second timeout for auth check
+    
     // Set up Firebase auth state listener
     if (typeof window === 'undefined' || !auth) {
       console.log("Auth provider: No window or auth object");
       setLoading(false);
-      return () => {};
+      return () => {
+        if (authCheckTimer.current) {
+          clearTimeout(authCheckTimer.current);
+        }
+      };
     }
     
     console.log("Setting up auth state listener...");
     const unsubscribe = onAuthStateChanged(auth, 
       (authUser) => {
+        // Clear the timeout since we got a response
+        if (authCheckTimer.current) {
+          clearTimeout(authCheckTimer.current);
+          authCheckTimer.current = null;
+        }
+        
         console.log("Auth state changed:", authUser ? `user exists: ${authUser.email}` : "no user");
         
         if (authUser) {
@@ -110,14 +131,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(true);
             safeSetItem("authUser", JSON.stringify(mappedUser));
             
-            // Set a flag to indicate successful authentication
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('just_signed_in', 'true');
-            }
-            
             console.log("User set from Firebase auth:", mappedUser.email);
           } catch (error) {
             console.error("Error mapping user:", error);
+            setIsAuthenticated(false);
           }
         } else {
           setUser(null);
@@ -133,6 +150,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Auth state change error:", error);
         // Set loading to false on error
         setLoading(false);
+        setIsAuthenticated(false);
+        
+        // Clear the timeout since we got a response (albeit an error)
+        if (authCheckTimer.current) {
+          clearTimeout(authCheckTimer.current);
+          authCheckTimer.current = null;
+        }
       }
     );
 
@@ -140,8 +164,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       console.log("Cleaning up auth state listener");
       unsubscribe();
+      
+      if (authCheckTimer.current) {
+        clearTimeout(authCheckTimer.current);
+        authCheckTimer.current = null;
+      }
     };
-  }, []);
+  }, [loading]);
 
   // Log authentication state for debugging
   useEffect(() => {
@@ -151,6 +180,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated
     });
   }, [user, loading, isAuthenticated]);
+
+  // Handle redirect loop blocker for existing auth
+  useEffect(() => {
+    if (!loading && isAuthenticated && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      const isAuthPage = currentPath.includes('/auth/');
+      
+      // If on auth page but already authenticated, redirect to dashboard (except if blocker exists)
+      if (isAuthPage && !sessionStorage.getItem('redirect_loop_blocker')) {
+        console.log("Already authenticated but on auth page, redirecting to dashboard");
+        sessionStorage.setItem('redirect_loop_blocker', 'true');
+        window.location.href = "/dashboard";
+      }
+    }
+  }, [loading, isAuthenticated]);
 
   return (
     <AuthContext.Provider value={{ user, loading, isAuthenticated }}>

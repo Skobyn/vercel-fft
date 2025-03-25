@@ -29,6 +29,7 @@ export default function SignInPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, loading, isAuthenticated } = useAuth();
+  const [redirectInProgress, setRedirectInProgress] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,25 +40,43 @@ export default function SignInPage() {
     mode: "onChange",
   });
 
-  // If user is already authenticated, redirect to dashboard
-  useEffect(() => {
-    if (!loading && isAuthenticated) {
-      console.log("User already authenticated, redirecting to dashboard");
-      // Use the more reliable direct navigation
-      window.location.href = "/dashboard";
-    }
-  }, [user, loading, isAuthenticated]);
-
-  // Clear any session storage flags when arriving at sign-in page
+  // Reset all session flags when landing on sign-in page
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      sessionStorage.clear();
+      // Clear all auth-related flags to prevent redirect loops
+      sessionStorage.removeItem('just_signed_in');
+      sessionStorage.removeItem('redirect_loop_blocker');
+      
+      console.log("Cleared session storage flags to prevent redirect loops");
     }
   }, []);
+
+  // Handle redirect if already authenticated
+  useEffect(() => {
+    // Only redirect if auth check is complete, user exists, and we're not already redirecting
+    if (!loading && isAuthenticated && !redirectInProgress) {
+      console.log("Already authenticated, redirecting to dashboard");
+      
+      // Set flag first to prevent duplicate redirects
+      setRedirectInProgress(true);
+      
+      // Slight delay to ensure state is updated before redirect
+      setTimeout(() => {
+        // Set a flag to prevent immediate redirect back
+        sessionStorage.setItem('redirect_loop_blocker', 'true');
+        window.location.href = "/dashboard";
+      }, 100);
+    }
+  }, [loading, isAuthenticated, redirectInProgress]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!auth) {
       toast.error("Authentication service is not available");
+      return;
+    }
+    
+    if (redirectInProgress) {
+      console.log("Redirect already in progress, ignoring form submission");
       return;
     }
 
@@ -78,7 +97,13 @@ export default function SignInPage() {
       toast.success("Signed in successfully!");
       
       // Set flag to prevent redirect loops
-      sessionStorage.setItem('just_signed_in', 'true');
+      setRedirectInProgress(true);
+      
+      // Set flag to prevent immediate redirect back
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('just_signed_in', 'true');
+        sessionStorage.setItem('redirect_loop_blocker', 'true');
+      }
       
       // Simple and direct redirect approach
       console.log("Redirecting to dashboard");
@@ -102,7 +127,6 @@ export default function SignInPage() {
       
       console.error("Formatted error message:", errorMessage);
       toast.error(errorMessage);
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -160,7 +184,7 @@ export default function SignInPage() {
             <Button 
               type="submit" 
               className="w-full"
-              disabled={isSubmitting || !form.formState.isValid}
+              disabled={isSubmitting || !form.formState.isValid || redirectInProgress}
             >
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
@@ -188,7 +212,11 @@ export default function SignInPage() {
                       user, 
                       loading,
                       isAuthenticated,
-                      authFromLocalStorage: localStorage.getItem('authUser')
+                      authFromLocalStorage: localStorage.getItem('authUser'),
+                      sessionStorage: {
+                        justSignedIn: sessionStorage.getItem('just_signed_in'),
+                        redirectLoopBlocker: sessionStorage.getItem('redirect_loop_blocker')
+                      }
                     });
                     
                     if (user) {
@@ -197,11 +225,25 @@ export default function SignInPage() {
                       toast.error("Not signed in");
                     }
                     
-                    // Add a button to go directly to dashboard in demo mode
+                    // Force clear all storage to reset state
+                    sessionStorage.clear();
+                    localStorage.removeItem('authUser');
+                    toast.info("Cleared all storage");
+                  }}
+                >
+                  Debug Auth State
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="w-full text-xs mt-2"
+                  onClick={() => {
+                    // Set redirect blocker and go directly to dashboard
+                    sessionStorage.setItem('redirect_loop_blocker', 'true');
                     window.location.href = "/dashboard";
                   }}
                 >
-                  Debug Auth State & Go to Dashboard
+                  Go to Dashboard (Demo Mode)
                 </Button>
               </div>
             )}

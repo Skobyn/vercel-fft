@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,19 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+  
+  // Clear any auth redirect flags once dashboard loads successfully
+  useEffect(() => {
+    // Set redirect_loop_blocker to true on dashboard
+    // This helps prevent infinite redirects between dashboard and sign-in
+    if (typeof window !== 'undefined') {
+      // Keep the redirect blocker but clear the just_signed_in flag
+      sessionStorage.setItem('redirect_loop_blocker', 'true');
+      sessionStorage.removeItem('just_signed_in');
+      
+      console.log("Dashboard loaded - Authentication flow complete");
+    }
+  }, []);
 
   // Mock data - in a real app, this would come from an API
   const summaryData = {

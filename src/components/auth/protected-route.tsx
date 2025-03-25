@@ -18,42 +18,76 @@ export function ProtectedRoute({
   const { user, loading, isAuthenticated } = useAuth();
   const [showContent, setShowContent] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [redirectCheckComplete, setRedirectCheckComplete] = useState(false);
 
   useEffect(() => {
-    // If just signed in, always show content
+    // Get special flags that help prevent redirect loops
     const justSignedIn = typeof window !== 'undefined' && sessionStorage.getItem('just_signed_in');
+    const redirectLoopBlocker = typeof window !== 'undefined' && sessionStorage.getItem('redirect_loop_blocker');
     
+    console.log("ProtectedRoute flags:", { 
+      justSignedIn, 
+      redirectLoopBlocker,
+      isAuthenticated, 
+      loading 
+    });
+    
+    // Only process redirect after loading completes
     if (!loading) {
-      if (isAuthenticated) {
-        // User is authenticated, show content
+      // If we have loop blocker flag, always show content and clear it (one-time use)
+      if (redirectLoopBlocker) {
+        console.log("Redirect loop blocker active, showing content");
+        setShowContent(true);
+        setIsDemoMode(!isAuthenticated);
+        
+        if (!isAuthenticated && allowDemo) {
+          toast.warning("You are viewing in demo mode. Some features may be limited.");
+        }
+        
+        // Clear the flag after use
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('redirect_loop_blocker');
+        }
+      } 
+      // If just signed in, show content regardless
+      else if (justSignedIn) {
+        console.log("Just signed in flag detected, showing content");
         setShowContent(true);
         setIsDemoMode(false);
-      } else if (justSignedIn) {
-        // Just signed in but auth not confirmed yet, show content
+      }
+      // Standard authenticated flow
+      else if (isAuthenticated) {
+        console.log("User is authenticated, showing content");
         setShowContent(true);
         setIsDemoMode(false);
-      } else if (allowDemo) {
-        // Not authenticated but demo allowed, show demo content
+      } 
+      // Allow demo mode if requested
+      else if (allowDemo) {
+        console.log("User not authenticated, showing demo mode");
         setShowContent(true);
         setIsDemoMode(true);
         toast.warning("You are viewing in demo mode. Some features may be limited.");
-      } else {
-        // Not authenticated and demo not allowed, redirect to login
+      } 
+      // No authentication, no demo mode: redirect
+      else {
+        console.log("User not authenticated and demo mode not allowed, redirecting to login");
         if (typeof window !== 'undefined') {
           // Use direct navigation for reliability
           window.location.href = '/auth/signin';
         }
       }
+      
+      setRedirectCheckComplete(true);
     }
   }, [loading, isAuthenticated, allowDemo]);
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (loading || !redirectCheckComplete) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Checking authentication...</p>
+          <p className="mt-2 text-sm text-gray-500">Loading...</p>
         </div>
       </div>
     );
