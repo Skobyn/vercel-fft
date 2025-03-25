@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AuthDebug } from "@/components/auth/auth-debug";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/providers/firebase-auth-provider";
-import { Google } from "lucide-react";
+import { LogIn } from "lucide-react";
 
 export default function AuthDebugPage() {
   const { signInWithGoogle, signOut } = useAuth();
@@ -44,7 +44,7 @@ export default function AuthDebugPage() {
           disabled={isLoading}
           className="flex items-center gap-2"
         >
-          <Google className="h-4 w-4" />
+          <LogIn className="h-4 w-4" />
           Sign In with Google
         </Button>
         
