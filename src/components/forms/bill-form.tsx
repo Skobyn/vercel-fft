@@ -47,7 +47,7 @@ const billFormSchema = z.object({
   }),
   isPaid: z.boolean().default(false),
   frequency: z.string().min(1, "Frequency is required"),
-  isAutoPay: z.boolean().default(false),
+  autoPay: z.boolean().default(false),
   notes: z.string().optional(),
 });
 
@@ -75,7 +75,7 @@ export default function BillForm({
     dueDate: bill?.dueDate ? new Date(bill.dueDate) : new Date(),
     isPaid: bill?.isPaid || false,
     frequency: bill?.frequency || "monthly",
-    isAutoPay: bill?.isAutoPay || false,
+    autoPay: bill?.autoPay || false,
     notes: bill?.notes || "",
   };
 
@@ -249,7 +249,7 @@ export default function BillForm({
 
             <FormField
               control={form.control}
-              name="isAutoPay"
+              name="autoPay"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                   <FormControl>
