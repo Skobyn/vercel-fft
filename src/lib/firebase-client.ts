@@ -94,4 +94,21 @@ export const getUserProfile = async (userId: string) => {
     console.error('Error fetching user profile:', error);
     throw error;
   }
+};
+
+// Helper for maintaining a persistent auth cookie that can be read by middleware
+export const updateAuthCookie = (user: User | null) => {
+  if (typeof window === 'undefined') return;
+  
+  if (user) {
+    // User is signed in, create/update the cookie with a 7-day expiration
+    user.getIdToken().then(token => {
+      document.cookie = `firebase-auth-token=${token}; path=/; max-age=604800; SameSite=Strict`;
+      console.log('Auth cookie updated');
+    });
+  } else {
+    // User is signed out, clear the cookie
+    document.cookie = 'firebase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    console.log('Auth cookie cleared');
+  }
 }; 

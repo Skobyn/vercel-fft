@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, User as FirebaseUser, updateProfile as updateFirebaseProfile } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase-client';
+import { auth, db, updateAuthCookie } from '@/lib/firebase-client';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -149,6 +149,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(userProfile);
             console.log("User authenticated:", userProfile.displayName);
             
+            // Update auth cookie for middleware
+            updateAuthCookie(firebaseUser);
+            
             // Check if we need to redirect to dashboard
             const justSignedIn = sessionStorage.getItem('just_signed_in');
             if (justSignedIn === 'true') {
@@ -164,10 +167,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setUser(null);
             console.log("No user authenticated");
+            
+            // Clear the auth cookie
+            updateAuthCookie(null);
           }
         } catch (error) {
           console.error("Auth error:", error);
           setUser(null);
+          
+          // Clear the auth cookie on error
+          updateAuthCookie(null);
         } finally {
           setLoading(false);
         }
@@ -321,6 +330,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { signOut: firebaseSignOut } = await import('firebase/auth');
       await firebaseSignOut(auth);
+      
+      // Explicitly clear the auth cookie
+      updateAuthCookie(null);
       
       toast.success('Signed out successfully');
     } catch (error: any) {
