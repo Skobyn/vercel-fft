@@ -37,7 +37,7 @@ export default function SignUpPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,11 +52,11 @@ export default function SignUpPage() {
 
   // If user is already authenticated, redirect to dashboard
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (!loading && user) {
       console.log("User already authenticated, redirecting to dashboard");
       window.location.href = "/dashboard";
     }
-  }, [loading, isAuthenticated]);
+  }, [loading, user]);
 
   // Check if Firebase Auth is initialized
   useEffect(() => {
