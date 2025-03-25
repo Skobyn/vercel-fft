@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Family Finance Tracker",
-  description: "Track and manage your family's finances",
+  title: "Achievr",
+  description: "Track and manage your family's finances with Achievr",
 };
 
 export default function RootLayout({

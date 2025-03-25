@@ -45,7 +45,7 @@ export function Header() {
       <div className="container flex h-16 items-center">
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <CircleDollarSign className="h-6 w-6" />
-          <span className="font-bold">Financial Flow</span>
+          <span className="font-bold">Achievr</span>
         </Link>
         <MainNav />
         <div className="ml-auto flex items-center">

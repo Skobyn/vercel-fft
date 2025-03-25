@@ -25,6 +25,7 @@ export function useFinancialProfile() {
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
@@ -39,17 +40,32 @@ export function useFinancialProfile() {
       // First ensure data is initialized
       await ensureUserDataInitialized(user.uid);
       
+      console.log(`Fetching financial profile for user ${user.uid}, retry: ${retryCount}`);
       const data = await FinancialService.getFinancialProfile(user.uid);
-      setProfile(data);
-      setError(null);
+      
+      if (data) {
+        console.log("Financial profile data received:", data);
+        setProfile(data);
+        setError(null);
+      } else {
+        console.error("No financial profile data returned");
+        setError(new Error("No financial profile data returned"));
+      }
     } catch (err: any) {
       console.error('Error fetching financial profile:', err);
       setError(err);
-      toast.error('Failed to load financial profile');
+      toast.error('Failed to load financial profile. Please refresh the page.');
+      
+      // Try again if we haven't reached max retries
+      if (retryCount < 3) {
+        console.log(`Retrying financial profile fetch (${retryCount + 1}/3)...`);
+        setRetryCount(prev => prev + 1);
+        setTimeout(fetchProfile, 2000); // Retry after 2 seconds
+      }
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, retryCount]);
 
   const updateBalance = useCallback(async (newBalance: number, reason: string) => {
     if (!user || !profile) {
@@ -58,7 +74,9 @@ export function useFinancialProfile() {
     }
 
     try {
+      console.log(`Updating balance for user ${user.uid} to ${newBalance}`);
       const updatedProfile = await FinancialService.updateBalance(user.uid, newBalance, reason);
+      console.log("Balance updated successfully:", updatedProfile);
       setProfile(updatedProfile);
       toast.success('Balance updated successfully');
       return updatedProfile;

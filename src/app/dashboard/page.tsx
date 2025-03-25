@@ -13,9 +13,10 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
 import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
 import { ArrowRight, X } from "lucide-react";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase-client";
 import { toast } from "sonner";
+import { initializeCollections } from '@/utils/database-debug';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -82,6 +83,21 @@ export default function DashboardPage() {
     try {
       // Create financial profile if it doesn't exist yet
       const profileRef = doc(db, 'financialProfiles', userId);
+      const profileSnap = await getDoc(profileRef);
+      
+      if (!profileSnap.exists()) {
+        // Create default financial profile
+        const defaultProfile: FinancialProfile = {
+          userId,
+          currentBalance: 0,
+          lastUpdated: new Date().toISOString(),
+          currency: 'USD',
+          hasCompletedSetup: false
+        };
+        
+        await setDoc(profileRef, defaultProfile);
+        console.log("Created default financial profile");
+      }
       
       // Create empty collections if they don't exist
       const collections = [
@@ -89,7 +105,8 @@ export default function DashboardPage() {
         { name: 'bills', path: `users/${userId}/bills` },
         { name: 'expenses', path: `users/${userId}/expenses` },
         { name: 'budgets', path: `users/${userId}/budgets` },
-        { name: 'goals', path: `users/${userId}/goals` }
+        { name: 'goals', path: `users/${userId}/goals` },
+        { name: 'balanceAdjustments', path: `users/${userId}/balanceAdjustments` }
       ];
       
       // Create a placeholder document in each collection
@@ -161,7 +178,33 @@ export default function DashboardPage() {
   return (
     <MainLayout>
       <div className="p-4 md:p-6">
-        <h1 className="text-3xl font-bold mb-6">Financial Dashboard</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Financial Dashboard</h1>
+          
+          {process.env.NODE_ENV !== 'production' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (user) {
+                  try {
+                    toast.loading("Initializing collections...");
+                    await initializeCollections(user.uid);
+                    toast.success("Collections initialized successfully! Refreshing...");
+                    setTimeout(() => window.location.reload(), 1500);
+                  } catch (error) {
+                    console.error("Error initializing collections:", error);
+                    toast.error("Failed to initialize collections");
+                  }
+                } else {
+                  toast.error("User not authenticated");
+                }
+              }}
+            >
+              Debug: Initialize Collections
+            </Button>
+          )}
+        </div>
         
         {showSetupGuide ? (
           <div className="mb-6">

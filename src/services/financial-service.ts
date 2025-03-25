@@ -37,11 +37,15 @@ const toISOString = (date: Date | string) => {
 // Get a user's financial profile
 export const getFinancialProfile = async (userId: string): Promise<FinancialProfile | null> => {
   try {
+    console.log("Getting financial profile for user:", userId);
     const docRef = doc(db, 'financialProfiles', userId);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
+      console.log("Financial profile found:", docSnap.data());
       return docSnap.data() as FinancialProfile;
+    } else {
+      console.log("Financial profile not found, creating default");
     }
     
     // Create a default profile if not exists
@@ -54,10 +58,18 @@ export const getFinancialProfile = async (userId: string): Promise<FinancialProf
     };
     
     await setDoc(docRef, defaultProfile);
+    console.log("Default profile created successfully");
     return defaultProfile;
   } catch (error) {
     console.error('Error getting financial profile:', error);
-    throw error;
+    // Return a default profile rather than throwing
+    return {
+      userId,
+      currentBalance: 0,
+      lastUpdated: new Date().toISOString(),
+      currency: 'USD',
+      hasCompletedSetup: false
+    };
   }
 };
 
@@ -71,21 +83,33 @@ export const updateBalance = async (
     const profileRef = doc(db, 'financialProfiles', userId);
     const profileSnap = await getDoc(profileRef);
     
-    if (!profileSnap.exists()) {
-      throw new Error('Financial profile not found');
+    let profile: FinancialProfile;
+    let previousBalance = 0;
+    
+    if (profileSnap.exists()) {
+      profile = profileSnap.data() as FinancialProfile;
+      previousBalance = profile.currentBalance;
+    } else {
+      // Create a default profile if it doesn't exist
+      profile = {
+        userId,
+        currentBalance: 0,
+        lastUpdated: new Date().toISOString(),
+        currency: 'USD',
+        hasCompletedSetup: false
+      };
     }
     
-    const profile = profileSnap.data() as FinancialProfile;
-    const previousBalance = profile.currentBalance;
-    
     // Update the profile
-    const updatedProfile: Partial<FinancialProfile> = {
+    const updatedProfile: FinancialProfile = {
+      ...profile,
       currentBalance: newBalance,
       lastUpdated: new Date().toISOString(),
       hasCompletedSetup: true // Mark that setup has begun
     };
     
-    await updateDoc(profileRef, updatedProfile);
+    // Use setDoc with merge to handle both create and update
+    await setDoc(profileRef, updatedProfile, { merge: true });
     
     // Create a balance adjustment record
     const adjustmentData: Omit<BalanceAdjustment, 'id'> = {
@@ -100,9 +124,10 @@ export const updateBalance = async (
       updatedAt: new Date().toISOString(),
     };
     
-    await addDoc(collection(db, 'balanceAdjustments'), adjustmentData);
+    // Store balance adjustment in user-specific collection
+    await addDoc(collection(db, `users/${userId}/balanceAdjustments`), adjustmentData);
     
-    return { ...profile, ...updatedProfile };
+    return updatedProfile;
   } catch (error) {
     console.error('Error updating balance:', error);
     throw error;
@@ -170,22 +195,52 @@ export const deleteIncome = async (id: string, userId: string): Promise<void> =>
 
 export const getIncomes = async (userId: string): Promise<Income[]> => {
   try {
-    const incomesQuery = query(
-      collection(db, `users/${userId}/incomes`),
-      orderBy('date', 'desc')
-    );
+    console.log(`Getting incomes for user ${userId} from users/${userId}/incomes`);
     
-    const querySnapshot = await getDocs(incomesQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+    // Try the user-specific path first
+    try {
+      const incomesQuery = query(
+        collection(db, `users/${userId}/incomes`),
+        orderBy('date', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(incomesQuery);
+      const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+      console.log(`Found ${results.length} incomes in users/${userId}/incomes`);
+      return results;
+    } catch (pathError) {
+      console.error(`Error accessing users/${userId}/incomes:`, pathError);
+      
+      // Try the global collection as fallback
+      console.log("Trying global incomes collection as fallback");
+      const fallbackQuery = query(
+        collection(db, 'incomes'),
+        where('userId', '==', userId),
+        orderBy('date', 'desc')
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const fallbackResults = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
+      console.log(`Found ${fallbackResults.length} incomes in global collection`);
+      
+      // If we found items in the global collection, migrate them to the user-specific path
+      if (fallbackResults.length > 0) {
+        console.log("Migrating income data to user-specific path");
+        
+        for (const income of fallbackResults) {
+          const { id, ...data } = income;
+          await setDoc(doc(db, `users/${userId}/incomes`, id), data);
+        }
+      }
+      
+      return fallbackResults;
+    }
   } catch (error) {
     console.error('Error getting incomes:', error);
     
-    // Return empty array if collection doesn't exist yet
-    if ((error as any)?.code === 'resource-exhausted') {
-      return [];
-    }
-    
-    throw error;
+    // Return empty array rather than throwing
+    console.log("Returning empty incomes array due to error");
+    return [];
   }
 };
 
@@ -250,17 +305,52 @@ export const deleteBill = async (id: string, userId: string): Promise<void> => {
 
 export const getBills = async (userId: string): Promise<Bill[]> => {
   try {
-    const billsQuery = query(
-      collection(db, 'bills'),
-      where('userId', '==', userId),
-      orderBy('dueDate', 'asc')
-    );
+    console.log(`Getting bills for user ${userId} from users/${userId}/bills`);
     
-    const querySnapshot = await getDocs(billsQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bill));
+    // Try the user-specific path first
+    try {
+      const billsQuery = query(
+        collection(db, `users/${userId}/bills`),
+        orderBy('dueDate', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(billsQuery);
+      const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bill));
+      console.log(`Found ${results.length} bills in users/${userId}/bills`);
+      return results;
+    } catch (pathError) {
+      console.error(`Error accessing users/${userId}/bills:`, pathError);
+      
+      // Try the global collection as fallback
+      console.log("Trying global bills collection as fallback");
+      const fallbackQuery = query(
+        collection(db, 'bills'),
+        where('userId', '==', userId),
+        orderBy('dueDate', 'asc')
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const fallbackResults = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bill));
+      console.log(`Found ${fallbackResults.length} bills in global collection`);
+      
+      // If we found items in the global collection, migrate them to the user-specific path
+      if (fallbackResults.length > 0) {
+        console.log("Migrating bill data to user-specific path");
+        
+        for (const bill of fallbackResults) {
+          const { id, ...data } = bill;
+          await setDoc(doc(db, `users/${userId}/bills`, id), data);
+        }
+      }
+      
+      return fallbackResults;
+    }
   } catch (error) {
     console.error('Error getting bills:', error);
-    throw error;
+    
+    // Return empty array rather than throwing
+    console.log("Returning empty bills array due to error");
+    return [];
   }
 };
 

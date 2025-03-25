@@ -1,4 +1,4 @@
-# Family Finance Tracker
+# Achievr
 
 A comprehensive family finance management application built with Next.js, Firebase, and shadcn/ui.
 
@@ -40,8 +40,8 @@ A comprehensive family finance management application built with Next.js, Fireba
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/family-finance-tracker.git
-cd family-finance-tracker
+git clone https://github.com/yourusername/achievr.git
+cd achievr
 ```
 
 2. Install dependencies:
