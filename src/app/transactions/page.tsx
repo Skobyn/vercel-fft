@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function TransactionsPage() {
   return (
-    <ProtectedRoute allowDemo={true}>
+    <ProtectedRoute>
       <MainLayout>
         <div className="space-y-6">
           <div>
