@@ -12,6 +12,7 @@ import { BillsList } from "@/components/dashboard/bills-list";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
 import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
+import { FinancialProfile } from "@/types/financial";
 import { ArrowRight, X } from "lucide-react";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase-client";
