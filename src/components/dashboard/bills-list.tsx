@@ -219,7 +219,8 @@ export function BillsList() {
                       <Badge variant="secondary" className="text-xs">
                         {FREQUENCY_LABEL[bill.frequency] || bill.frequency}
                       </Badge>
-                      {bill.isAutoPay && (
+                      {/* Check if bill is set for automatic payment */}
+                      {bill.autoPay && (
                         <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">
                           Auto Pay
                         </Badge>
