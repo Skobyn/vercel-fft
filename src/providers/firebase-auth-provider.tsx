@@ -5,6 +5,7 @@ import { onAuthStateChanged, User as FirebaseUser, updateProfile as updateFireba
 import { auth, db } from '@/lib/firebase-client';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 // User type that maps Firebase user properties
 export type User = {
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
+  const router = useRouter();
 
   // Listen for auth state changes
   useEffect(() => {
@@ -109,6 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(userProfile);
             setDemoMode(false);
             console.log("User authenticated:", userProfile.displayName);
+            
+            // Check if we need to redirect to dashboard
+            const justSignedIn = sessionStorage.getItem('just_signed_in');
+            if (justSignedIn === 'true') {
+              sessionStorage.removeItem('just_signed_in');
+              router.push('/dashboard');
+            }
           } else {
             setUser(null);
             console.log("No user authenticated");
@@ -128,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return () => {};
     }
-  }, []);
+  }, [router]);
 
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
@@ -138,6 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { signInWithEmailAndPassword } = await import('firebase/auth');
       await signInWithEmailAndPassword(auth, email, password);
+      
+      // Set flag that we just signed in to trigger redirect in auth state listener
+      sessionStorage.setItem('just_signed_in', 'true');
       
       toast.success('Signed in successfully');
     } catch (error: any) {

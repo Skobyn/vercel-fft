@@ -57,9 +57,11 @@ interface IncomeListProps {
   incomes: Income[];
   onEdit: (income: Partial<Income> & { id: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  loading?: boolean;
+  error?: Error | null;
 }
 
-export function IncomeList({ incomes, onEdit, onDelete }: IncomeListProps) {
+export function IncomeList({ incomes, onEdit, onDelete, loading, error }: IncomeListProps) {
   const [editIncome, setEditIncome] = useState<Income | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);

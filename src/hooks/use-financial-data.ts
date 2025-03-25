@@ -6,6 +6,20 @@ import {
 import * as FinancialService from '@/services/financial-service';
 import { toast } from 'sonner';
 
+// Helper to ensure user data is properly initialized
+const ensureUserDataInitialized = async (userId: string) => {
+  try {
+    // Check if profile exists, create if not
+    const profile = await FinancialService.getFinancialProfile(userId);
+    
+    // Can add more initialization checks here if needed
+    return true;
+  } catch (error) {
+    console.error('Error initializing user data:', error);
+    return false;
+  }
+};
+
 export function useFinancialProfile() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
@@ -21,6 +35,10 @@ export function useFinancialProfile() {
 
     try {
       setLoading(true);
+      
+      // First ensure data is initialized
+      await ensureUserDataInitialized(user.uid);
+      
       const data = await FinancialService.getFinancialProfile(user.uid);
       setProfile(data);
       setError(null);

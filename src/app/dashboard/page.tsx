@@ -11,12 +11,13 @@ import { IncomeList } from "@/components/dashboard/income-list";
 import { BillsList } from "@/components/dashboard/bills-list";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
-import { useFinancialProfile } from "@/hooks/use-financial-data";
+import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
 import { ArrowRight, X } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, loading, demoMode } = useAuth();
   const { profile, loading: profileLoading } = useFinancialProfile();
+  const { incomes, loading: incomesLoading, error: incomesError, updateIncome, deleteIncome } = useIncomes();
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const router = useRouter();
 
@@ -40,7 +41,7 @@ export default function DashboardPage() {
     }
   }, [user, profile, profileLoading]);
 
-  if (loading || profileLoading) {
+  if (loading || profileLoading || incomesLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">
@@ -99,7 +100,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <IncomeList />
+              <IncomeList 
+                incomes={incomes} 
+                onEdit={updateIncome} 
+                onDelete={deleteIncome}
+                loading={incomesLoading}
+                error={incomesError}
+              />
               <BillsList />
             </div>
             
