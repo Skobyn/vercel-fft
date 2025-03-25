@@ -3,13 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase-client';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-
-// Simple User type with minimal needed properties
-type User = {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-};
+import { User, mapFirebaseUser } from '@/types/user';
 
 interface AuthContextType {
   user: User | null;
@@ -27,15 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Simple auth listener
   useEffect(() => {
-    // Function to map Firebase user to our user type
-    function mapUser(firebaseUser: FirebaseUser): User {
-      return {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-      };
-    }
-    
     // Skip if no window (SSR) or no auth
     if (typeof window === 'undefined' || !auth) {
       setLoading(false);
@@ -48,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (authUser) => {
         if (authUser) {
           // User is signed in
-          setUser(mapUser(authUser));
+          setUser(mapFirebaseUser(authUser));
         } else {
           // User is signed out
           setUser(null);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MainNav } from "@/components/layout/main-nav";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,7 +48,11 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>{user.email?.[0] || "U"}</AvatarFallback>
+                    {user.photoURL ? (
+                      <AvatarImage src={user.photoURL} alt={user.displayName || ""} />
+                    ) : (
+                      <AvatarFallback>{user.email?.[0] || "U"}</AvatarFallback>
+                    )}
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
