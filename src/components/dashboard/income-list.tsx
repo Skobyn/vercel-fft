@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Income } from "@/types/financial";
 import { useIncomes } from "@/hooks/use-financial-data";
-import IncomeForm from "@/components/forms/income-form";
+import { IncomeForm } from "@/components/forms/income-form";
 import { formatCurrency } from "@/utils/financial-utils";
 import {
   AlertDialog,

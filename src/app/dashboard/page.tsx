@@ -28,10 +28,10 @@ export default function DashboardPage() {
 
   // Check if it's a new user to show setup guide
   useEffect(() => {
-    if (user && profile?.profile && !profileLoading) {
+    if (user && profile && !profileLoading) {
       // Show setup guide for new users or if they haven't completed setup
       const isFirstVisit = !localStorage.getItem("has_visited_dashboard");
-      const hasCompletedSetup = profile.profile.hasCompletedSetup;
+      const hasCompletedSetup = profile.hasCompletedSetup;
       
       if (isFirstVisit || !hasCompletedSetup) {
         setShowSetupGuide(true);
