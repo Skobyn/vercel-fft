@@ -95,6 +95,26 @@ export default function ForecastingPage() {
   const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState<boolean>(true);
   const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);
   const [openAddExpenseDialog, setOpenAddExpenseDialog] = useState(false);
+  
+  // Placeholder for optional expenses - in the future, this would come from the database
+  const optionalExpenses = [
+    {
+      id: '1',
+      name: 'Entertainment',
+      amount: 150,
+      category: 'Entertainment',
+      likelihood: 90,
+      isPriority: false,
+    },
+    {
+      id: '2',
+      name: 'Shopping',
+      amount: 200,
+      category: 'Shopping',
+      likelihood: 60,
+      isPriority: false,
+    }
+  ];
 
   useEffect(() => {
     if (!loading && !user) {
@@ -114,8 +134,8 @@ export default function ForecastingPage() {
       // Generate forecast data using the utility function
       const forecast = generateCashFlowForecast(
         profile.profile.currentBalance,
-        incomes,
-        bills,
+        incomes.incomes || [],
+        bills.bills || [],
         [], // No balance adjustments for this view
         days
       );
@@ -462,15 +482,12 @@ export default function ForecastingPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {incomes.map((income) => (
+                  {incomes.incomes.map((income) => (
                     <div key={income.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <ArrowUp className="h-4 w-4 text-emerald-500" />
                           <p className="font-medium">{income.name}</p>
-                          {income.isPredicted && (
-                            <Badge variant="outline" className="text-xs">Predicted</Badge>
-                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <CalendarClock className="h-3 w-3" />
@@ -575,20 +592,17 @@ export default function ForecastingPage() {
                       </div>
 
                       <div className="max-h-80 overflow-y-auto space-y-4">
-                        {bills.map((expense) => (
+                        {bills.bills.map((expense) => (
                           <div key={expense.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <CreditCard className="h-4 w-4 text-rose-500" />
                                 <p className="font-medium">{expense.name}</p>
-                                {expense.isPredicted && (
-                                  <Badge variant="outline" className="text-xs">Predicted</Badge>
-                                )}
                               </div>
                               <div className="flex flex-col xs:flex-row xs:items-center gap-x-2 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <CalendarClock className="h-3 w-3" />
-                                  <span>{new Date(expense.date).toLocaleDateString()}</span>
+                                  <span>{new Date(expense.dueDate).toLocaleDateString()}</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="hidden xs:inline">•</span>

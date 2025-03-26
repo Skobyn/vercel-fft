@@ -49,7 +49,7 @@ import { useFinancialData } from '@/hooks/use-financial-data';
 import AddIncomeForm from '../forms/add-income-form';
 import AddExpenseForm from '../forms/add-expense-form';
 import UpdateBalanceForm from '../forms/update-balance-form';
-import { FinancialService } from '@/services/financial-service';
+import { addBill } from '@/services/financial-service';
 
 interface SetupGuideProps {
   onClose?: () => void;
@@ -203,10 +203,11 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
         isPaid: false,
         autoPay: false,
         notes: '',
+        isRecurring: data.frequency !== 'once', // Set isRecurring based on frequency
       };
       
       // Use the financial service to add a bill instead of an expense
-      await FinancialService.addBill(billData, user.uid);
+      await addBill(billData, user.uid);
       
       // Mark this step as completed
       markStepComplete("expenses");
