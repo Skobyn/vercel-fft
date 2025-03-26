@@ -75,14 +75,24 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     // Use timeout to avoid blocking the main thread for too long
     timeoutRef.current = setTimeout(() => {
       try {
+        // Safely access profile.profile, which we already checked above
+        // Using non-null assertion since we already checked above
+        const profileData = profile.profile!;
+        
+        // Use safe values for logging
+        const balanceForLogging = typeof profileData.currentBalance === 'number' 
+          ? profileData.currentBalance 
+          : 0;
+        
         console.log("Generating cash flow forecast with:", {
-          balance: profile.profile.currentBalance,
+          balance: balanceForLogging,
           incomes: (incomes?.incomes || []).length,
           bills: (bills?.bills || []).length,
           timeframe
         });
         
-        const balance = profile.profile.currentBalance;
+        // Use null coalescing to ensure we have valid values
+        const balance = profileData.currentBalance ?? 0;
         const incomeData = incomes?.incomes || [];
         const billData = bills?.bills || [];
         const daysValue = parseInt(timeframe);
@@ -119,11 +129,11 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         setForecastData([{
           itemId: 'initial-balance',
           date: new Date().toISOString(),
-          amount: profile.profile?.currentBalance || 0,
+          amount: profile.profile?.currentBalance ?? 0,
           category: 'balance',
           name: 'Current Balance',
           type: 'balance',
-          runningBalance: profile.profile?.currentBalance || 0
+          runningBalance: profile.profile?.currentBalance ?? 0
         }]);
       } finally {
         setIsGeneratingForecast(false);
