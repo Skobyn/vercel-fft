@@ -11,6 +11,7 @@ graph TD
     B --> E[Form Components]
     B --> F[Chart Components]
     B --> V[Visualization Components]
+    B --> W[Calendar Components]
     G[Hooks] --> H[Custom Hooks]
     G --> I[Context Providers]
     J[Utils] --> K[API Helpers]
@@ -71,6 +72,14 @@ graph LR
 - Responsive sizing for different devices
 - Adaptable visualization types with shared props
 
+### 7. Calendar Integration
+- Usage of react-day-picker as base calendar
+- Custom day rendering for bills and expenses
+- Visual indicators for financial events
+- Interactive day selection
+- Detailed view for day events
+- TypeScript integration with proper prop types
+
 ## Component Organization
 
 ### Directory Structure
@@ -82,6 +91,7 @@ src/
 │   ├── layout/         # Layout components
 │   ├── forms/          # Form components
 │   ├── charts/         # Data visualization
+│   ├── calendar/       # Calendar components
 │   └── visualizations/ # Interactive visualizations
 ├── lib/                # Utility functions
 ├── hooks/              # Custom hooks
@@ -160,6 +170,45 @@ export function GoalVisualization({
         <Progress value={percentage} />
       </CardContent>
     </Card>
+  );
+}
+```
+
+5. **Calendar Components**
+```typescript
+// components/calendar/BillsCalendar.tsx
+export function BillsCalendar({ 
+  bills, 
+  expenses,
+  onBillClick,
+  onExpenseClick 
+}) {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // Custom day component to show financial info
+  const CustomDay = (props: DayProps) => {
+    // Day rendering with bills/expenses indicators
+    return (
+      <div className="...">
+        {/* Day content with financial indicators */}
+      </div>
+    );
+  };
+  
+  return (
+    <div className="space-y-4">
+      <Calendar
+        mode="single"
+        selected={selectedDate}
+        onSelect={setSelectedDate}
+        components={{ Day: CustomDay }}
+      />
+      {selectedDate && (
+        <Card>
+          {/* Selected day details with bills and expenses */}
+        </Card>
+      )}
+    </div>
   );
 }
 ```
