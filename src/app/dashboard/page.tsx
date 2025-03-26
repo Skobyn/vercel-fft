@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/firebase-auth-provider";
 import { Button } from "@/components/ui/button";
@@ -11,25 +11,75 @@ import { IncomeList } from "@/components/dashboard/income-list";
 import { BillsList } from "@/components/dashboard/bills-list";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SetupGuide } from "@/components/onboarding/setup-guide";
-import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
-import { FinancialProfile } from "@/types/financial";
+import { useFinancialProfile, useIncomes, useBills, useExpenses } from "@/hooks/use-financial-data";
+import { FinancialProfile, Bill, Expense, Income } from "@/types/financial";
 import { ArrowRight, X } from "lucide-react";
 import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase-client";
 import { toast } from "sonner";
 import { initializeCollections } from '@/utils/database-debug';
 import { DebugPanel } from "@/components/dashboard/debug-panel";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+
+function formatCashFlowEvents(bills: Bill[], expenses: Expense[], incomes: Income[]) {
+  const events = [
+    ...bills.map(bill => ({
+      type: 'bill' as const,
+      amount: bill.amount,
+      date: new Date(bill.dueDate),
+      description: bill.name,
+      category: bill.category,
+      recurring: bill.isRecurring || false
+    })),
+    ...expenses.map(expense => ({
+      type: 'expense' as const,
+      amount: expense.amount,
+      date: new Date(expense.date),
+      description: expense.name,
+      category: expense.category,
+      recurring: false // Expenses don't have recurring property
+    })),
+    ...incomes.map(inc => ({
+      type: 'income' as const,
+      amount: inc.amount,
+      date: new Date(inc.date),
+      description: inc.name,
+      category: inc.category || 'Income',
+      recurring: inc.isRecurring || false
+    }))
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  let balance = 0;
+  return events.map(event => {
+    if (event.type === 'income') {
+      balance += event.amount;
+    } else {
+      balance -= event.amount;
+    }
+    return {
+      ...event,
+      balance
+    };
+  });
+}
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const { profile, loading: profileLoading, updateBalance } = useFinancialProfile();
   const { incomes, loading: incomesLoading, error: incomesError, updateIncome, deleteIncome } = useIncomes();
+  const { bills, loading: billsLoading } = useBills();
+  const { expenses, loading: expensesLoading } = useExpenses();
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const router = useRouter();
+
+  const cashFlowEvents = useMemo(() => {
+    return formatCashFlowEvents(bills || [], expenses || [], incomes);
+  }, [bills, expenses, incomes]);
 
   // Authentication check
   useEffect(() => {
@@ -297,6 +347,35 @@ export default function DashboardPage() {
                 <DebugPanel userId={user.uid} />
               </div>
             )}
+
+            <div className="space-y-4">
+              {cashFlowEvents.map((event, index) => (
+                <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    event.type === 'income' ? 'bg-green-500' : 'bg-red-500'
+                  )} />
+                  <div className="flex-1">
+                    <div className="font-medium">{event.description}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {format(event.date, 'MMM d, yyyy')} • {event.category}
+                      {event.recurring && ' • Recurring'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={cn(
+                      "font-medium",
+                      event.type === 'income' ? 'text-green-500' : 'text-red-500'
+                    )}>
+                      {event.type === 'income' ? '+' : '-'}${event.amount.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Balance: ${event.balance.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>

@@ -28,6 +28,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { toast } from "sonner";
 import { BudgetVisualization } from "@/components/visualizations/budget-visualizations";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { ShoppingCart, Home, Car, Utensils, Dumbbell, Plane } from "lucide-react";
 
 type BudgetCategory = {
   id: string;
@@ -56,7 +57,7 @@ export default function BudgetsPage() {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [displayFrequency, setDisplayFrequency] = useState<"daily" | "weekly" | "monthly">("monthly");
   const [budgetFrequency, setBudgetFrequency] = useState<"once" | "daily" | "weekly" | "biweekly" | "monthly">("monthly");
-  const [visualizationType, setVisualizationType] = useState<'bucket' | 'envelope' | 'gauge' | 'fill'>('fill');
+  const [visualizationType, setVisualizationType] = useState<"basic" | "bucket" | "envelope" | "gauge">("basic");
 
   // Sample predefined categories
   const predefinedCategories = [
@@ -519,7 +520,7 @@ export default function BudgetsPage() {
                     className="w-[400px]"
                   >
                     <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="fill">Basic</TabsTrigger>
+                      <TabsTrigger value="basic">Basic</TabsTrigger>
                       <TabsTrigger value="bucket">Bucket</TabsTrigger>
                       <TabsTrigger value="envelope">Envelope</TabsTrigger>
                       <TabsTrigger value="gauge">Gauge</TabsTrigger>
@@ -533,9 +534,11 @@ export default function BudgetsPage() {
                     <BudgetVisualization
                       key={budget.id}
                       name={budget.name}
+                      category={budget.category}
                       spent={budget.spent}
                       budget={budget.amount}
                       type={visualizationType}
+                      icon={budget.icon}
                     />
                   ))}
                 </div>

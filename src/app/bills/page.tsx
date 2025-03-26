@@ -41,6 +41,7 @@ import {
 import { BulkBillsEditor } from "@/components/forms/bulk-bills-editor";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { BillsCalendar } from "@/components/calendar/bills-calendar";
 
 const FREQUENCY_LABEL: Record<string, string> = {
   once: "One Time",
@@ -440,37 +441,12 @@ export default function BillsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col space-y-4">
-                  <div className="rounded-md border p-4">
-                    <CalendarIcon className="h-32 w-32 mx-auto text-muted-foreground/20" />
-                    <p className="text-center mt-4 text-muted-foreground">
-                      Calendar view coming soon...
-                    </p>
-                  </div>
-                  <div className="space-y-4">
-                    {/* Group and display expenses by date */}
-                    {filteredExpenses.map((expense) => (
-                      <div
-                        key={expense.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex flex-col">
-                            <span className="font-medium">{expense.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {format(new Date(expense.date), 'PPP')}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-lg font-medium">
-                            {formatCurrency(expense.amount)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <BillsCalendar 
+                  bills={filteredBills} 
+                  expenses={filteredExpenses}
+                  onBillClick={handleEditBill}
+                  onExpenseClick={(expense) => router.push(`/bills/expenses?id=${expense.id}`)}
+                />
               </CardContent>
             </Card>
           </TabsContent>
