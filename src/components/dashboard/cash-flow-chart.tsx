@@ -34,7 +34,17 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   const [timeframe, setTimeframe] = useState<string>("90");
   
   useEffect(() => {
-    if (profile?.profile && !loading) {
+    // Guard clause to prevent unnecessary processing
+    if (!profile?.profile || loading) return;
+
+    try {
+      console.log("Generating cash flow forecast with:", {
+        balance: profile.profile.currentBalance,
+        incomes: (incomes?.incomes || []).length,
+        bills: (bills?.bills || []).length,
+        timeframe
+      });
+      
       const forecast = generateCashFlowForecast(
         profile.profile.currentBalance,
         incomes?.incomes || [],
@@ -42,7 +52,16 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         [], // No balance adjustments yet
         parseInt(timeframe)
       );
-      setForecastData(forecast);
+      
+      // Only update state if forecast is valid to prevent unnecessary renders
+      if (Array.isArray(forecast) && forecast.length > 0) {
+        setForecastData(forecast);
+      } else {
+        console.log("Generated empty forecast, not updating state");
+      }
+    } catch (error) {
+      console.error("Error generating cash flow forecast:", error);
+      // Don't update state on error to prevent rendering issues
     }
   }, [profile, incomes, bills, loading, timeframe]);
 

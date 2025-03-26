@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const router = useRouter();
 
   // Authentication check
@@ -138,6 +139,22 @@ export default function DashboardPage() {
     }
   };
 
+  // Handle closing setup guide with transition
+  const handleCloseSetupGuide = () => {
+    // Set transitioning to prevent component thrashing
+    setIsTransitioning(true);
+    
+    // Add small delay before changing state to avoid synchronous re-renders
+    setTimeout(() => {
+      setShowSetupGuide(false);
+      
+      // Add small delay before removing transition state
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 500); // Adjust time as needed
+    }, 100);
+  };
+
   // Show loading state while checking authentication or loading profile
   if (loading || (!authChecked && !user)) {
     return (
@@ -150,7 +167,7 @@ export default function DashboardPage() {
   }
 
   // Show loading state while loading financial data
-  if (profileLoading || incomesLoading) {
+  if (profileLoading || incomesLoading || isTransitioning) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">
@@ -206,14 +223,14 @@ export default function DashboardPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowSetupGuide(false)}
+                onClick={handleCloseSetupGuide}
               >
                 <X className="h-4 w-4 mr-2" />
                 Close Setup Guide
               </Button>
             </div>
             <SetupGuide
-              onClose={() => setShowSetupGuide(false)}
+              onClose={handleCloseSetupGuide}
               onSetBalance={handleUpdateBalance}
             />
           </div>

@@ -82,7 +82,10 @@ export function useFinancialProfile() {
         fetchProfile();
       }, 2000);
       
-      return () => clearTimeout(timer);
+      return () => {
+        console.log("Clearing retry timer");
+        clearTimeout(timer);
+      };
     }
   }, [shouldRetry, fetchProfile, retryCount]);
 
@@ -118,7 +121,7 @@ export function useFinancialProfile() {
     
     const initProfile = async () => {
       try {
-        await fetchProfile();
+        if (mounted) await fetchProfile();
       } catch (err) {
         console.error("Error in initial profile fetch:", err);
       }
@@ -129,6 +132,9 @@ export function useFinancialProfile() {
     // Cleanup function
     return () => {
       mounted = false;
+      // Reset retry state on unmount to prevent loops on remount
+      setShouldRetry(false);
+      setRetryCount(0);
     };
   }, [fetchProfile]);
 
@@ -804,16 +810,40 @@ export function useFinancialData() {
   ]);
   
   const refetchAll = useCallback(() => {
-    // Wrap in setTimeout to prevent synchronous updates from causing render loops
-    setTimeout(() => {
-      profile.refetch();
-      incomes.refetch();
-      bills.refetch();
-      expenses.refetch();
-      budgets.refetch();
-      goals.refetch();
-    }, 0);
-  }, [profile.refetch, incomes.refetch, bills.refetch, expenses.refetch, budgets.refetch, goals.refetch]);
+    // Don't refetch if already loading to prevent chain reactions
+    if (loading) {
+      console.log("Skipping refetchAll because already loading");
+      return;
+    }
+    
+    console.log("Refetching all financial data");
+    
+    // Use a more controlled approach with individual try/catch blocks
+    const safeRefetch = async (name: string, refetchFn: Function) => {
+      try {
+        await refetchFn();
+      } catch (err) {
+        console.error(`Error refetching ${name}:`, err);
+      }
+    };
+    
+    // Execute refetches with a slight delay between each
+    setTimeout(() => safeRefetch('profile', profile.refetch), 0);
+    setTimeout(() => safeRefetch('incomes', incomes.refetch), 100);
+    setTimeout(() => safeRefetch('bills', bills.refetch), 200);
+    setTimeout(() => safeRefetch('expenses', expenses.refetch), 300);
+    setTimeout(() => safeRefetch('budgets', budgets.refetch), 400);
+    setTimeout(() => safeRefetch('goals', goals.refetch), 500);
+    
+  }, [
+    loading,
+    profile.refetch, 
+    incomes.refetch, 
+    bills.refetch, 
+    expenses.refetch, 
+    budgets.refetch, 
+    goals.refetch
+  ]);
   
   // Use useMemo to memoize the return object to prevent unnecessary rerenders
   return useMemo(() => ({

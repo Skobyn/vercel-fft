@@ -89,68 +89,145 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
  */
 export function generateCashFlowForecast(
   currentBalance: number,
-  incomes: Income[],
-  bills: Bill[],
+  incomes: Income[] = [],
+  bills: Bill[] = [],
   balanceAdjustments: BalanceAdjustment[] = [],
   days: number = 90
 ): ForecastItem[] {
-  let forecast: ForecastItem[] = [];
-  
-  // Add initial balance as a forecast item
-  forecast.push({
-    itemId: 'initial-balance',
-    date: new Date().toISOString(),
-    amount: currentBalance,
-    category: 'balance',
-    name: 'Current Balance',
-    type: 'balance'
-  });
-  
-  // Process incomes
-  incomes.forEach(income => {
-    const occurrences = generateOccurrences(income, 'date', days);
-    forecast = [...forecast, ...occurrences];
-  });
-  
-  // Process bills
-  bills.forEach(bill => {
-    if (!bill.isPaid) {
-      const occurrences = generateOccurrences(
-        { ...bill, amount: -Math.abs(bill.amount) }, // Ensure bill amount is negative
-        'dueDate', 
-        days
-      );
-      forecast = [...forecast, ...occurrences];
-    }
-  });
-  
-  // Add balance adjustments
-  balanceAdjustments.forEach(adjustment => {
-    forecast.push({
-      itemId: adjustment.id,
-      date: adjustment.date,
-      amount: adjustment.amount,
-      category: 'adjustment',
-      name: adjustment.reason || 'Balance Adjustment',
-      type: 'adjustment'
+  try {
+    console.log('Starting forecast generation with:', {
+      currentBalance,
+      incomes: incomes?.length || 0,
+      bills: bills?.length || 0,
+      adjustments: balanceAdjustments?.length || 0,
+      days
     });
-  });
-  
-  // Sort by date
-  forecast.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  // Calculate running balance
-  let runningBalance = 0;
-  forecast.forEach(item => {
-    if (item.type === 'balance') {
-      runningBalance = item.amount;
-    } else {
-      runningBalance += item.amount;
+    
+    // Validate inputs
+    if (isNaN(currentBalance) || !isFinite(currentBalance)) {
+      console.error('Invalid current balance:', currentBalance);
+      currentBalance = 0;
     }
-    item.runningBalance = runningBalance;
-  });
-  
-  return forecast;
+    
+    if (!Array.isArray(incomes)) {
+      console.error('Incomes is not an array:', incomes);
+      incomes = [];
+    }
+    
+    if (!Array.isArray(bills)) {
+      console.error('Bills is not an array:', bills);
+      bills = [];
+    }
+    
+    if (!Array.isArray(balanceAdjustments)) {
+      console.error('Balance adjustments is not an array:', balanceAdjustments);
+      balanceAdjustments = [];
+    }
+    
+    if (isNaN(days) || days <= 0 || days > 365) {
+      console.error('Invalid days parameter:', days);
+      days = 90;
+    }
+    
+    let forecast: ForecastItem[] = [];
+    
+    // Add initial balance as a forecast item
+    forecast.push({
+      itemId: 'initial-balance',
+      date: new Date().toISOString(),
+      amount: currentBalance,
+      category: 'balance',
+      name: 'Current Balance',
+      type: 'balance'
+    });
+    
+    // Process incomes (with error handling for each item)
+    incomes.forEach(income => {
+      try {
+        const occurrences = generateOccurrences(income, 'date', days);
+        forecast = [...forecast, ...occurrences];
+      } catch (error) {
+        console.error('Error processing income item:', income, error);
+      }
+    });
+    
+    // Process bills (with error handling for each item)
+    bills.forEach(bill => {
+      try {
+        if (!bill.isPaid) {
+          const occurrences = generateOccurrences(
+            { ...bill, amount: -Math.abs(bill.amount) }, // Ensure bill amount is negative
+            'dueDate', 
+            days
+          );
+          forecast = [...forecast, ...occurrences];
+        }
+      } catch (error) {
+        console.error('Error processing bill item:', bill, error);
+      }
+    });
+    
+    // Add balance adjustments (with error handling for each item)
+    balanceAdjustments.forEach(adjustment => {
+      try {
+        forecast.push({
+          itemId: adjustment.id,
+          date: adjustment.date,
+          amount: adjustment.amount,
+          category: 'adjustment',
+          name: adjustment.reason || 'Balance Adjustment',
+          type: 'adjustment'
+        });
+      } catch (error) {
+        console.error('Error processing balance adjustment:', adjustment, error);
+      }
+    });
+    
+    // Sort by date
+    forecast.sort((a, b) => {
+      try {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      } catch (error) {
+        // Default to 0 (equal) if there's an error
+        console.error('Error sorting forecast items:', a, b, error);
+        return 0;
+      }
+    });
+    
+    // Calculate running balance
+    let runningBalance = 0;
+    forecast.forEach(item => {
+      try {
+        if (item.type === 'balance') {
+          runningBalance = item.amount;
+        } else {
+          // Ensure item.amount is a valid number
+          const amountToAdd = isNaN(item.amount) ? 0 : item.amount;
+          runningBalance += amountToAdd;
+        }
+        item.runningBalance = runningBalance;
+      } catch (error) {
+        console.error('Error calculating running balance for item:', item, error);
+        // Preserve previous running balance
+        item.runningBalance = runningBalance;
+      }
+    });
+    
+    console.log(`Generated forecast with ${forecast.length} items`);
+    return forecast;
+  } catch (error) {
+    console.error('Error in generateCashFlowForecast:', error);
+    // Return minimal valid forecast to prevent UI errors
+    return [{
+      itemId: 'initial-balance',
+      date: new Date().toISOString(),
+      amount: currentBalance || 0,
+      category: 'balance',
+      name: 'Current Balance',
+      type: 'balance',
+      runningBalance: currentBalance || 0
+    }];
+  }
 }
 
 /**
