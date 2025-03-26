@@ -62,7 +62,11 @@ interface Category {
   type: 'income' | 'expense';
 }
 
-export function TransactionForm() {
+interface TransactionFormProps {
+  onSuccess?: () => void;
+}
+
+export function TransactionForm({ onSuccess }: TransactionFormProps) {
   // Fetch accounts and categories
   const { data: accounts, loading: accountsLoading, fetchData: fetchAccounts } = useFirestoreData<Account>('financial_accounts');
   const { data: categories, loading: categoriesLoading, fetchData: fetchCategories } = useFirestoreData<Category>('categories');
@@ -116,6 +120,11 @@ export function TransactionForm() {
 
       toast.success("Transaction added successfully!");
       form.reset();
+      
+      // Call the onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error: any) {
       toast.error("Error adding transaction: " + error.message);
     }

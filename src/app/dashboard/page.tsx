@@ -279,20 +279,32 @@ export default function DashboardPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Financial Dashboard</h1>
           
-          {process.env.NODE_ENV !== 'production' && user && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const debugSection = document.getElementById('debug-section');
-                if (debugSection) {
-                  debugSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-            >
-              Debug Tools
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!showSetupGuide && (
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSetupGuide(true)}
+              >
+                Open Setup Guide
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+            
+            {process.env.NODE_ENV !== 'production' && user && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const debugSection = document.getElementById('debug-section');
+                  if (debugSection) {
+                    debugSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+              >
+                Debug Tools
+              </Button>
+            )}
+          </div>
         </div>
         
         {showSetupGuide ? (
@@ -331,51 +343,11 @@ export default function DashboardPage() {
               <BillsList />
             </div>
             
-            <div className="mt-6 text-center">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSetupGuide(true)}
-                className="mx-auto"
-              >
-                Open Setup Guide
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-            
             {process.env.NODE_ENV !== 'production' && user && (
               <div id="debug-section">
                 <DebugPanel userId={user.uid} />
               </div>
             )}
-
-            <div className="space-y-4">
-              {cashFlowEvents.map((event, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card">
-                  <div className={cn(
-                    "w-2 h-2 rounded-full",
-                    event.type === 'income' ? 'bg-green-500' : 'bg-red-500'
-                  )} />
-                  <div className="flex-1">
-                    <div className="font-medium">{event.description}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {format(event.date, 'MMM d, yyyy')} • {event.category}
-                      {event.recurring && ' • Recurring'}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={cn(
-                      "font-medium",
-                      event.type === 'income' ? 'text-green-500' : 'text-red-500'
-                    )}>
-                      {event.type === 'income' ? '+' : '-'}${event.amount.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Balance: ${event.balance.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </>
         )}
       </div>

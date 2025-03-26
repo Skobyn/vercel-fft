@@ -110,7 +110,7 @@ export default function SignInPage() {
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/40">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center space-y-2 mb-6">
-          <div className="p-2 bg-primary text-primary-foreground rounded-full">
+          <div className="p-2 bg-indigo-600 text-white rounded-full">
             <TrendingUp className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-bold">Achievr</h1>

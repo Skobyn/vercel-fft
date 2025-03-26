@@ -12,35 +12,42 @@ export function calculateNextOccurrence(startDate: string, frequency: string): s
     return date.toISOString();
   }
 
-  // Otherwise, calculate the next occurrence
+  // Calculate the next occurrence based on frequency
+  let nextDate = new Date(date);
+  
   switch (frequency) {
     case 'daily':
-      date.setDate(date.getDate() + 1);
+      nextDate.setDate(nextDate.getDate() + 1);
       break;
     case 'weekly':
-      date.setDate(date.getDate() + 7);
+      nextDate.setDate(nextDate.getDate() + 7);
       break;
     case 'biweekly':
-      date.setDate(date.getDate() + 14);
+      nextDate.setDate(nextDate.getDate() + 14);
       break;
     case 'monthly':
-      date.setMonth(date.getMonth() + 1);
+      nextDate.setMonth(nextDate.getMonth() + 1);
       break;
     case 'quarterly':
-      date.setMonth(date.getMonth() + 3);
+      nextDate.setMonth(nextDate.getMonth() + 3);
       break;
     case 'semiannually':
-      date.setMonth(date.getMonth() + 6);
+      nextDate.setMonth(nextDate.getMonth() + 6);
       break;
     case 'annually':
-      date.setFullYear(date.getFullYear() + 1);
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
       break;
     default:
       // If no recurrence, return the original date
       return date.toISOString();
   }
 
-  return date.toISOString();
+  // If the calculated date is still in the past, recursively calculate the next one
+  if (nextDate <= now) {
+    return calculateNextOccurrence(nextDate.toISOString(), frequency);
+  }
+  
+  return nextDate.toISOString();
 }
 
 /**
@@ -51,6 +58,7 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
   dateField: keyof T, 
   days: number = 90
 ): Array<ForecastItem> {
+  // For non-recurring items, just return the single occurrence
   if (!item.frequency || item.frequency === 'once') {
     return [{
       itemId: item.id,
@@ -63,13 +71,20 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
   }
 
   const occurrences: ForecastItem[] = [];
-  const endDate = item.endDate ? new Date(item.endDate) : new Date();
-  if (!item.endDate) {
-    endDate.setDate(endDate.getDate() + days);
+  
+  // Set end date to now + days for the forecast period
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + days);
+  
+  // Start from the original date or today if it's in the past
+  let currentDate = new Date(item[dateField] as string);
+  if (currentDate < startDate) {
+    // If the original date is in the past, calculate the next occurrence from today
+    currentDate = new Date(calculateNextOccurrence(startDate.toISOString(), item.frequency));
   }
   
-  let currentDate = new Date(item[dateField] as string);
-  
+  // Generate occurrences until we reach the end date
   while (currentDate <= endDate) {
     occurrences.push({
       itemId: item.id,
@@ -80,6 +95,7 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
       type: item.amount >= 0 ? 'income' : 'expense'
     });
     
+    // Calculate the next occurrence based on the frequency
     currentDate = new Date(calculateNextOccurrence(currentDate.toISOString(), item.frequency));
   }
   
@@ -162,13 +178,26 @@ export function generateCashFlowForecast(
       }
     };
     
-    // Process incomes - simpler version that avoids complex calculations
+    // Process incomes with proper recurring handling
     safelyAddItems(validIncomes, (income) => {
       // Only process valid income items
       if (!income.id || !income.date || isNaN(income.amount)) return null;
       
-      // For recurring items, we'll just simplify to one occurrence
-      // This prevents exponential growth of forecast items
+      // For recurring items, generate all occurrences for the forecast period
+      if (income.isRecurring && income.frequency) {
+        return generateOccurrences(
+          {
+            ...income,
+            id: income.id,
+            frequency: income.frequency,
+            amount: income.amount
+          },
+          'date',
+          normalizedDays
+        );
+      }
+      
+      // For non-recurring items, just add the single occurrence
       return {
         itemId: income.id,
         date: income.date,
@@ -177,11 +206,11 @@ export function generateCashFlowForecast(
         name: income.name || 'Income',
         type: 'income',
         runningBalance: 0, // Will be calculated later
-        description: `${income.name} (${income.category})${income.isRecurring ? ' - Recurring' : ''}`
+        description: `${income.name} (${income.category})`
       };
     }, 'income');
     
-    // Process bills - simplified to avoid excessive items
+    // Process bills with proper recurring handling
     safelyAddItems(validBills, (bill) => {
       // Skip paid bills
       if (bill.isPaid) return null;
@@ -189,6 +218,26 @@ export function generateCashFlowForecast(
       // Only process valid bill items
       if (!bill.id || !bill.dueDate || isNaN(bill.amount)) return null;
       
+      // For recurring bills, generate all occurrences for the forecast period
+      if (bill.isRecurring && bill.frequency) {
+        return generateOccurrences(
+          {
+            ...bill,
+            id: bill.id,
+            frequency: bill.frequency,
+            amount: -Math.abs(bill.amount),
+            date: bill.dueDate
+          },
+          'date',
+          normalizedDays
+        ).map(item => ({
+          ...item,
+          type: 'bill',
+          description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
+        }));
+      }
+      
+      // For non-recurring bills, just add the single occurrence
       return {
         itemId: bill.id,
         date: bill.dueDate,
@@ -197,15 +246,17 @@ export function generateCashFlowForecast(
         name: bill.name || 'Bill',
         type: 'bill',
         runningBalance: 0, // Will be calculated later
-        description: `${bill.name} (${bill.category})${bill.isRecurring ? ' - Recurring' : ''} - Due${bill.autoPay ? ' - AutoPay' : ''}`
+        description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
       };
     }, 'bill');
 
-    // Process expenses
+    // Process expenses with proper recurring handling
     safelyAddItems(validExpenses, (expense) => {
       // Only process valid expense items
       if (!expense.id || !expense.date || isNaN(expense.amount)) return null;
       
+      // Expenses don't have recurring properties in our data model
+      // Just add the single occurrence
       return {
         itemId: expense.id,
         date: expense.date,

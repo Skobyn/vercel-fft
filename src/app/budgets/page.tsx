@@ -544,67 +544,6 @@ export default function BudgetsPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {filteredBudgetCategories.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>No results found</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Try adjusting your search or filters.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredBudgetCategories.map((category) => {
-                  const adjustedBudget = adjustAmountForFrequency(category.budgeted, category.frequency);
-                  const adjustedSpent = adjustAmountForFrequency(category.spent, category.frequency);
-                  const percentSpent = adjustedBudget > 0 ? (adjustedSpent / adjustedBudget) * 100 : 0;
-                  
-                  return (
-                    <Card key={category.id} className="overflow-hidden">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center text-lg">
-                          <span className="mr-2">{category.icon}</span>
-                          {category.name}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-2">
-                          <span className={`inline-block w-3 h-3 rounded-full ${category.color}`}></span>
-                          {predefinedCategories.find(c => c.value === category.category)?.label || category.category}
-                          <span className="text-xs">({category.frequency})</span>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Budget ({displayFrequency})</span>
-                          <span className="font-medium">${adjustedBudget.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">Spent ({displayFrequency})</span>
-                          <span className="font-medium">${adjustedSpent.toFixed(2)}</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-2 ${getStatusColor(adjustedBudget, adjustedSpent)}`}
-                            style={{ width: `${Math.min(100, percentSpent)}%` }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {Math.min(100, percentSpent).toFixed(0)}% spent
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ${(adjustedBudget - adjustedSpent).toFixed(2)} remaining
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
           </>
         )}
       </div>

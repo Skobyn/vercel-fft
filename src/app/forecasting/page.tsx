@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -98,6 +98,9 @@ type BalanceEdit = {
   note?: string;
 };
 
+// Add type definition for the forecast period
+type ForecastPeriod = "1m" | "3m" | "6m" | "12m";
+
 export default function ForecastingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -105,8 +108,25 @@ export default function ForecastingPage() {
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
   const [monthlyBreakdown, setMonthlyBreakdown] = useState<MonthlyForecast[]>([]);
 
-  const [forecastPeriod, setForecastPeriod] = useState<string>("3m");
-  const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState<boolean>(true);
+  // Various state for scenario mode
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [scenarioName, setScenarioName] = useState("Default Scenario");
+  const [incomeAdjustment, setIncomeAdjustment] = useState(0);
+  const [expensesAdjustment, setExpensesAdjustment] = useState(0);
+  const [savingsAdjustment, setSavingsAdjustment] = useState(0);
+  const [unexpectedExpense, setUnexpectedExpense] = useState(0);
+  const [unexpectedExpenseDate, setUnexpectedExpenseDate] = useState<Date | undefined>(undefined);
+  const [scenarioForecast, setScenarioForecast] = useState<ForecastItem[]>([]);
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
+  const [newBalance, setNewBalance] = useState(0);
+  const [balanceNote, setBalanceNote] = useState("");
+  const [balanceEdits, setBalanceEdits] = useState<BalanceEdit[]>([]);
+  
+  // State for forecast period selection
+  const [forecastPeriod, setForecastPeriod] = useState<ForecastPeriod>("3m");
+  
+  // State for filters and optional expenses
+  const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState(true);
   const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);
   const [openAddExpenseDialog, setOpenAddExpenseDialog] = useState(false);
   
@@ -115,11 +135,13 @@ export default function ForecastingPage() {
     balanceId: string | null;
     incomesCount: number;
     billsCount: number;
+    expensesCount: number;
     forecastPeriod: string;
   }>({
     balanceId: null,
     incomesCount: 0,
     billsCount: 0,
+    expensesCount: 0,
     forecastPeriod: "3m"
   });
   
@@ -143,129 +165,210 @@ export default function ForecastingPage() {
     }
   ];
 
-  // Add new state for scenario simulations
-  const [isSimulationMode, setIsSimulationMode] = useState(false);
-  const [scenarioName, setScenarioName] = useState("Default Scenario");
-  const [incomeAdjustment, setIncomeAdjustment] = useState(0);
-  const [expensesAdjustment, setExpensesAdjustment] = useState(0);
-  const [savingsAdjustment, setSavingsAdjustment] = useState(0);
-  const [unexpectedExpense, setUnexpectedExpense] = useState(0);
-  const [unexpectedExpenseDate, setUnexpectedExpenseDate] = useState<Date | undefined>(undefined);
-  const [scenarioForecast, setScenarioForecast] = useState<ForecastItem[]>([]);
-  const [isEditingBalance, setIsEditingBalance] = useState(false);
-  const [newBalance, setNewBalance] = useState<number>(0);
-  const [balanceNote, setBalanceNote] = useState<string>("");
-  const [balanceEdits, setBalanceEdits] = useState<BalanceEdit[]>([]);
-
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth/signin");
     }
   }, [authLoading, user, router]);
 
-  // Generate forecast data and monthly breakdown
+  // Generate forecast data
   useEffect(() => {
-    // Don't do anything if still loading
-    if (authLoading || financialData.loading || !financialData.profileData) return;
+    if (!financialData.profileData || !financialData.incomesData || !financialData.billsData || !financialData.expensesData) return;
 
-    // Get current state for reference
-    const currentBalance = financialData.profileData?.currentBalance || 0;
-    const incomesArray = financialData.incomesData || [];
-    const billsArray = financialData.billsData || [];
-    const balanceId = `${currentBalance}-${financialData.profileData?.lastUpdated || ''}`;
+    const currentBalance = financialData.profileData;
+    const incomes = financialData.incomesData;
+    const bills = financialData.billsData;
+    const expenses = financialData.expensesData;
+    const balanceAdjustments: any[] = [];
     
-    // Check if we need to regenerate the forecast
-    const shouldRegenerateForcecast = 
-      lastGenerationRef.current.balanceId !== balanceId ||
-      lastGenerationRef.current.incomesCount !== incomesArray.length ||
-      lastGenerationRef.current.billsCount !== billsArray.length ||
-      lastGenerationRef.current.forecastPeriod !== forecastPeriod;
-    
-    // Skip generation if data is the same as before
-    if (!shouldRegenerateForcecast && forecastData.length > 0) {
-      return;
-    }
+    // Calculate days based on forecastPeriod
+    let forecastDays = 90;
+    if (forecastPeriod === "1m") forecastDays = 30;
+    else if (forecastPeriod === "3m") forecastDays = 90;
+    else if (forecastPeriod === "6m") forecastDays = 180;
+    else if (forecastPeriod === "12m") forecastDays = 365;
 
+    // Log recurring items counts for debugging
+    console.log("Forecasting with:", {
+      totalIncomes: incomes.length,
+      recurringIncomes: incomes.filter(i => i.isRecurring).length,
+      totalBills: bills.length,
+      recurringBills: bills.filter(b => b.isRecurring).length,
+      totalExpenses: expenses.length,
+      plannedExpenses: expenses.filter(e => e.isPlanned).length,
+      forecastDays
+    });
+    
     try {
-      const days = forecastPeriod === "1m" ? 30 : 
-                   forecastPeriod === "3m" ? 90 :
-                   forecastPeriod === "6m" ? 180 : 365;
-      
-      // Generate forecast data using the utility function
+      // Generate baseline forecast
       const forecast = generateCashFlowForecast(
-        currentBalance,
-        incomesArray,
-        billsArray,
-        financialData.expensesData || [], // Add expenses
-        [], // No balance adjustments for this view
-        days
+        currentBalance.currentBalance,
+        incomes,
+        bills,
+        expenses,
+        balanceAdjustments,
+        forecastDays
       );
-      
-      // Update the last generation reference
+      setForecastData(forecast);
+
+      // Log resulting forecast size
+      console.log(`Generated ${forecast.length} forecast items`);
+
+      // Generate monthly breakdown from forecast data
+      const monthlyData = generateMonthlyBreakdown(forecast);
+      setMonthlyBreakdown(monthlyData);
+
+      // Generate scenario forecast if simulation mode is enabled
+      if (isSimulationMode) {
+        generateScenarioForecast();
+      } else {
+        setScenarioForecast([]);
+      }
+
+      // Update last generation reference to track state
       lastGenerationRef.current = {
-        balanceId,
-        incomesCount: incomesArray.length,
-        billsCount: billsArray.length,
+        balanceId: currentBalance.lastUpdated || Date.now().toString(),
+        incomesCount: incomes.length,
+        billsCount: bills.length,
+        expensesCount: expenses.length,
         forecastPeriod
       };
-      
-      setForecastData(forecast);
-      
-      // Generate monthly breakdown from forecast data
-      generateMonthlyBreakdown(forecast, scenarioForecast);
     } catch (error) {
       console.error("Error generating forecast:", error);
-      // Create a minimal forecast with just the current balance
-      const minimalForecast: ForecastItem[] = [{
-        itemId: 'initial-balance',
-        date: new Date().toISOString(),
-        amount: financialData.profileData.currentBalance || 0,
-        category: 'balance',
-        name: 'Current Balance',
-        type: 'balance' as const,
-        runningBalance: financialData.profileData.currentBalance || 0
-      }];
-      setForecastData(minimalForecast);
-      generateMonthlyBreakdown(minimalForecast, scenarioForecast);
+      setForecastData([]);
+      setScenarioForecast([]);
     }
-  }, [forecastPeriod, financialData, authLoading, forecastData.length, scenarioForecast]);
+  }, [financialData.profileData, financialData.incomesData, financialData.billsData, financialData.expensesData, forecastPeriod, isSimulationMode]);
+
+  // Function to generate scenario forecast
+  const generateScenarioForecast = useCallback(() => {
+    if (!financialData.profileData || !financialData.incomesData || !financialData.billsData || !financialData.expensesData) return;
+
+    // Calculate days based on forecastPeriod
+    let forecastDays = 90;
+    if (forecastPeriod === "1m") forecastDays = 30;
+    else if (forecastPeriod === "3m") forecastDays = 90;
+    else if (forecastPeriod === "6m") forecastDays = 180;
+    else if (forecastPeriod === "12m") forecastDays = 365;
+
+    try {
+      const currentBalance = financialData.profileData.currentBalance || 0;
+      const incomesArray = financialData.incomesData || [];
+      const billsArray = financialData.billsData || [];
+      const expensesArray = financialData.expensesData || [];
+
+      // Apply income adjustment to all incomes
+      const adjustedIncomes = incomesArray.map(income => ({
+        ...income,
+        amount: income.amount * (1 + incomeAdjustment / 100)
+      }));
+      
+      // Apply expense adjustment to all bills and expenses
+      const adjustedBills = billsArray.map(bill => ({
+        ...bill,
+        amount: bill.amount * (1 + expensesAdjustment / 100)
+      }));
+
+      const adjustedExpenses = expensesArray.map(expense => ({
+        ...expense,
+        amount: expense.amount * (1 + expensesAdjustment / 100)
+      }));
+      
+      // Add monthly savings increase if specified
+      const balanceAdjustments: any[] = [];
+      if (savingsAdjustment > 0) {
+        // Create an adjustment for each month in the forecast period
+        const monthsInForecast = Math.ceil(forecastDays / 30);
+        for (let i = 0; i < monthsInForecast; i++) {
+          const date = new Date();
+          date.setDate(1); // First day of the month
+          date.setMonth(date.getMonth() + i + 1); // Add months
+          
+          balanceAdjustments.push({
+            id: `savings-increase-${i}`,
+            date: date.toISOString(),
+            amount: savingsAdjustment,
+            category: 'Income',
+            name: 'Monthly Savings Increase',
+            type: 'income',
+            description: 'Monthly Savings Increase'
+          });
+        }
+      }
+      
+      // Add unexpected expense if specified
+      if (unexpectedExpense > 0 && unexpectedExpenseDate) {
+        balanceAdjustments.push({
+          id: `unexpected-${Date.now()}`,
+          date: unexpectedExpenseDate.toISOString(),
+          amount: -unexpectedExpense,
+          category: 'Unexpected',
+          name: 'Unexpected Expense',
+          type: 'expense',
+          description: 'Unexpected Expense'
+        });
+      }
+      
+      // Generate forecast with adjusted values
+      const scenarioForecast = generateCashFlowForecast(
+        currentBalance,
+        adjustedIncomes,
+        adjustedBills,
+        adjustedExpenses,
+        balanceAdjustments,
+        forecastDays
+      );
+      
+      setScenarioForecast(scenarioForecast);
+    } catch (error) {
+      console.error("Error generating scenario forecast:", error);
+      setScenarioForecast([]);
+    }
+  }, [
+    financialData.profileData,
+    financialData.incomesData,
+    financialData.billsData,
+    financialData.expensesData,
+    forecastPeriod,
+    incomeAdjustment,
+    expensesAdjustment,
+    savingsAdjustment,
+    unexpectedExpense,
+    unexpectedExpenseDate
+  ]);
 
   // Function to generate monthly breakdown from forecast data
   const generateMonthlyBreakdown = (forecast: ForecastItem[], scenarioForecast?: ForecastItem[]) => {
     // Initialize 12 months of data
     const months: Record<string, MonthlyForecast> = {};
-    const now = new Date();
     
-    // Pre-initialize 12 months
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-      const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      
-      months[monthKey] = {
-        month: monthName,
-        startingBalance: i === 0 ? (financialData.profileData?.currentBalance || 0) : 0,
-        income: 0,
-        mandatoryExpenses: 0,
-        optionalExpenses: 0,
-        endingBalance: 0
-      };
-    }
-    
-    // Process baseline forecast
+    // Process each forecast item
     forecast.forEach(item => {
       const date = new Date(item.date);
-      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       
-      if (months[monthKey]) {
-        if (item.type === 'income') {
-          months[monthKey].income += item.amount;
-        } else if (item.type === 'expense' || item.type === 'bill') {
-          if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
-            months[monthKey].optionalExpenses += Math.abs(item.amount);
-          } else {
-            months[monthKey].mandatoryExpenses += Math.abs(item.amount);
-          }
+      // Initialize month if needed
+      if (!months[monthKey]) {
+        const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        months[monthKey] = {
+          month: monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          startingBalance: 0,
+          income: 0,
+          mandatoryExpenses: 0,
+          optionalExpenses: 0,
+          endingBalance: 0
+        };
+      }
+      
+      // Update month data based on item type
+      if (item.type === 'income') {
+        months[monthKey].income += item.amount;
+      } else if (item.type === 'expense' || item.type === 'bill') {
+        // Categorize expenses as mandatory or optional
+        if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
+          months[monthKey].optionalExpenses += Math.abs(item.amount);
+        } else {
+          months[monthKey].mandatoryExpenses += Math.abs(item.amount);
         }
       }
     });
@@ -274,7 +377,7 @@ export default function ForecastingPage() {
     if (scenarioForecast?.length) {
       scenarioForecast.forEach(item => {
         const date = new Date(item.date);
-        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         
         if (months[monthKey]) {
           if (item.type === 'income') {
@@ -290,9 +393,12 @@ export default function ForecastingPage() {
       });
     }
     
+    // Get starting balance from the financial data
+    const initialBalance = financialData.profileData?.currentBalance || 0;
+    
     // Calculate running balances for both baseline and scenario
-    let runningBalance = financialData.profileData?.currentBalance || 0;
-    let scenarioRunningBalance = financialData.profileData?.currentBalance || 0;
+    let runningBalance = initialBalance;
+    let scenarioRunningBalance = initialBalance;
     
     Object.values(months).forEach(month => {
       // Baseline calculations
@@ -315,7 +421,7 @@ export default function ForecastingPage() {
       return new Date(a.month).getTime() - new Date(b.month).getTime();
     });
     
-    setMonthlyBreakdown(monthlyData);
+    return monthlyData;
   };
 
   // Add this function to handle balance updates
@@ -340,54 +446,10 @@ export default function ForecastingPage() {
 
   // Modify the applyScenario function
   const applyScenario = () => {
-    if (authLoading || financialData.loading || !financialData.profileData) return;
+    if (authLoading || !isSimulationMode) return;
     
     try {
-      const days = forecastPeriod === "1m" ? 30 : 
-                 forecastPeriod === "3m" ? 90 :
-                 forecastPeriod === "6m" ? 180 : 365;
-      
-      const currentBalance = financialData.profileData?.currentBalance || 0;
-      const incomesArray = financialData.incomesData || [];
-      const billsArray = financialData.billsData || [];
-      
-      // Apply income adjustment to all incomes
-      const adjustedIncomes = incomesArray.map(income => ({
-        ...income,
-        amount: income.amount * (1 + incomeAdjustment / 100)
-      }));
-      
-      // Apply expense adjustment to all bills
-      const adjustedBills = billsArray.map(bill => ({
-        ...bill,
-        amount: bill.amount * (1 + expensesAdjustment / 100)
-      }));
-      
-      // Add unexpected expense if specified
-      const balanceAdjustments: any[] = [];
-      if (unexpectedExpense > 0 && unexpectedExpenseDate) {
-        balanceAdjustments.push({
-          id: `unexpected-${Date.now()}`,
-          date: unexpectedExpenseDate,
-          amount: -unexpectedExpense,
-          category: 'Unexpected',
-          name: 'Unexpected Expense',
-          type: 'adjustment',
-          reason: 'Unexpected Expense'
-        });
-      }
-      
-      // Generate forecast with adjusted values
-      const scenarioForecast = generateCashFlowForecast(
-        currentBalance,
-        adjustedIncomes,
-        adjustedBills,
-        financialData.expensesData || [],
-        balanceAdjustments,
-        365 // Always generate 12 months for monthly breakdown
-      );
-      
-      setScenarioForecast(scenarioForecast);
+      generateScenarioForecast();
     } catch (error) {
       console.error("Error applying scenario:", error);
       toast.error("Failed to apply scenario adjustments");
@@ -510,17 +572,39 @@ export default function ForecastingPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Forecast period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1m">1 Month</SelectItem>
-                <SelectItem value="3m">3 Months</SelectItem>
-                <SelectItem value="6m">6 Months</SelectItem>
-                <SelectItem value="12m">12 Months</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center space-x-4 justify-end mb-2">
+              <div className="text-sm text-muted-foreground">Timeframe:</div>
+              <SelectGroup className="flex space-x-1">
+                <Button
+                  variant={forecastPeriod === "1m" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setForecastPeriod("1m")}
+                >
+                  1 Month
+                </Button>
+                <Button
+                  variant={forecastPeriod === "3m" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setForecastPeriod("3m")}
+                >
+                  3 Months
+                </Button>
+                <Button
+                  variant={forecastPeriod === "6m" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setForecastPeriod("6m")}
+                >
+                  6 Months
+                </Button>
+                <Button
+                  variant={forecastPeriod === "12m" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setForecastPeriod("12m")}
+                >
+                  1 Year
+                </Button>
+              </SelectGroup>
+            </div>
             <Button variant="outline" className="gap-2">
               <Settings className="h-4 w-4" />
               Settings
@@ -630,6 +714,7 @@ export default function ForecastingPage() {
                 baselineData={forecastData}
                 scenarioData={scenarioForecast}
                 className="h-full w-full"
+                timeFrame={forecastPeriod}
               />
             ) : (
               <div className="h-full flex items-center justify-center">
@@ -766,7 +851,14 @@ export default function ForecastingPage() {
                   </div>
                   <Switch
                     checked={isSimulationMode}
-                    onCheckedChange={setIsSimulationMode}
+                    onCheckedChange={(checked) => {
+                      setIsSimulationMode(checked);
+                      if (checked) {
+                        generateScenarioForecast();
+                      } else {
+                        setScenarioForecast([]);
+                      }
+                    }}
                   />
                 </div>
               </CardHeader>
@@ -902,41 +994,6 @@ export default function ForecastingPage() {
               </CardContent>
             </Card>
           </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Main forecast chart */}
-          <Card className="col-span-2 h-[400px]">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Cash Flow Forecast</CardTitle>
-                  <CardDescription>
-                    Projected cash flow over the next {forecastPeriod === "1m" ? "month" : forecastPeriod === "3m" ? "3 months" : forecastPeriod === "6m" ? "6 months" : "year"}
-                  </CardDescription>
-                </div>
-                <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Select timeframe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1m">1 Month</SelectItem>
-                    <SelectItem value="3m">3 Months</SelectItem>
-                    <SelectItem value="6m">6 Months</SelectItem>
-                    <SelectItem value="12m">1 Year</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ForecastChart 
-                  baselineData={forecastData} 
-                  scenarioData={scenarioForecast}
-                />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Add balance edit dialog */}

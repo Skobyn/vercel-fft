@@ -97,7 +97,7 @@
 
 ### 3. Advanced Features
 - [ ] Bill reminders
-- [x] Savings goals
+- [ ] Savings goals
 - [ ] Investment tracking
 - [ ] Debt management
 - [ ] Financial calendar

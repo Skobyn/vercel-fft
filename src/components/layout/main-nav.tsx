@@ -96,9 +96,9 @@ export function MainNav() {
       active: pathname === "/income",
     },
     {
-      href: "/bills/expenses",
+      href: "/bills",
       label: "Bills & Expenses",
-      active: pathname === "/bills/expenses" || pathname === "/bills",
+      active: pathname === "/bills" || pathname === "/bills/expenses",
     },
     {
       href: "/forecasting",
