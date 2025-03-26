@@ -108,27 +108,35 @@ export default function BillsExpensesPage() {
     }
   };
   
-  const handleSubmit = () => {
-    // In a real app, this would save the data to your database
-    console.log("Submitting expense:", {
-      type: billType,
-      name: billName,
-      amount: parseFloat(billAmount),
-      frequency: billFrequency,
-      category: billCategory,
-      date: billDate,
-      paymentMethod: billPaymentMethod,
-      isAutomatic: billIsAutomatic,
-      hasReminders: billHasReminders,
-      reminderDays: billReminderDays,
-      // Special expense fields if applicable
-      ...(billType === "special" && {
-        specialType: specialExpenseType,
-        person: specialExpensePerson,
-        specialDate: specialExpenseDate,
-        budget: parseFloat(specialExpenseBudget),
-      }),
-    });
+  const handleSubmit = async () => {
+    try {
+      const expenseDate = billType === "regular" ? billDate : specialExpenseDate;
+      if (!expenseDate) {
+        toast.error("Please select a date");
+        return;
+      }
+
+      const expenseData = {
+        name: billName,
+        amount: parseFloat(billAmount),
+        category: billCategory,
+        date: expenseDate.toISOString(),
+        isPlanned: true,
+        notes: billType === "special" ? `Special expense: ${specialExpenseType}${specialExpensePerson ? ` for ${specialExpensePerson}` : ''}` : undefined,
+        frequency: billFrequency,
+        paymentMethod: billPaymentMethod,
+        isAutomatic: billIsAutomatic,
+        hasReminders: billHasReminders,
+        reminderDays: billReminderDays
+      };
+
+      await addExpense(expenseData);
+      toast.success('Expense saved successfully');
+      router.push('/bills');
+    } catch (error) {
+      console.error("Error saving expense:", error);
+      toast.error("Failed to save expense. Please try again.");
+    }
     
     // Reset form and go back to step 1
     setBillType("regular");

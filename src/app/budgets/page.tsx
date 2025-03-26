@@ -23,9 +23,11 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useAuth } from '@/providers/firebase-auth-provider';
-import { useBudgets } from '@/hooks/use-financial-data';
+import { useBudgets, useExpenses } from '@/hooks/use-financial-data';
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { toast } from "sonner";
+import { BudgetVisualization } from "@/components/visualizations/budget-visualizations";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 type BudgetCategory = {
   id: string;
@@ -42,6 +44,7 @@ export default function BudgetsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { budgets, loading: budgetsLoading, addBudget, updateBudget, deleteBudget } = useBudgets();
+  const { expenses, loading: expensesLoading } = useExpenses();
   
   const [openNewBudgetDialog, setOpenNewBudgetDialog] = useState(false);
   const [budgetName, setBudgetName] = useState("");
@@ -53,6 +56,7 @@ export default function BudgetsPage() {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [displayFrequency, setDisplayFrequency] = useState<"daily" | "weekly" | "monthly">("monthly");
   const [budgetFrequency, setBudgetFrequency] = useState<"once" | "daily" | "weekly" | "biweekly" | "monthly">("monthly");
+  const [visualizationType, setVisualizationType] = useState<'bucket' | 'envelope' | 'gauge' | 'fill'>('fill');
 
   // Sample predefined categories
   const predefinedCategories = [
@@ -231,6 +235,25 @@ export default function BudgetsPage() {
   if (!user) {
     return null;
   }
+
+  // Calculate spending for each budget
+  const budgetSpending = budgets.map(budget => {
+    const start = startOfMonth(new Date());
+    const end = endOfMonth(new Date());
+
+    const spent = expenses
+      .filter(expense => 
+        expense.category === budget.category &&
+        new Date(expense.date) >= start &&
+        new Date(expense.date) <= end
+      )
+      .reduce((sum, expense) => sum + expense.amount, 0);
+
+    return {
+      ...budget,
+      spent
+    };
+  });
 
   return (
     <MainLayout>
@@ -480,6 +503,44 @@ export default function BudgetsPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Budget Overview</CardTitle>
+                    <CardDescription>
+                      Choose how you want to visualize your budgets
+                    </CardDescription>
+                  </div>
+                  <Tabs 
+                    value={visualizationType} 
+                    onValueChange={(value) => setVisualizationType(value as any)}
+                    className="w-[400px]"
+                  >
+                    <TabsList className="grid w-full grid-cols-4">
+                      <TabsTrigger value="fill">Basic</TabsTrigger>
+                      <TabsTrigger value="bucket">Bucket</TabsTrigger>
+                      <TabsTrigger value="envelope">Envelope</TabsTrigger>
+                      <TabsTrigger value="gauge">Gauge</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {budgetSpending.map(budget => (
+                    <BudgetVisualization
+                      key={budget.id}
+                      name={budget.name}
+                      spent={budget.spent}
+                      budget={budget.amount}
+                      type={visualizationType}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {filteredBudgetCategories.length === 0 ? (
               <Card>

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Calendar, BarChart3, Clock, Search, CalendarDays, Filter, Plus, Wallet, CircleDollarSign, CheckCircle, CalendarClock, CreditCard, BarChart4 } from "lucide-react";
+import { Calendar as CalendarIcon, BarChart3, Clock, Search, CalendarDays, Filter, Plus, Wallet, CircleDollarSign, CheckCircle, CalendarClock, CreditCard, BarChart4, List, AlertCircle } from "lucide-react";
 import { useAuth } from "@/providers/firebase-auth-provider";
 import { useBills, useExpenses } from "@/hooks/use-financial-data";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BulkBillsEditor } from "@/components/forms/bulk-bills-editor";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 const FREQUENCY_LABEL: Record<string, string> = {
   once: "One Time",
@@ -274,45 +275,36 @@ export default function BillsPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="bills" value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between mb-4">
-            <TabsList>
-              <TabsTrigger value="bills" className="gap-2">
-                <CreditCard className="h-4 w-4" />
-                Bills
-              </TabsTrigger>
-              <TabsTrigger value="expenses" className="gap-2">
-                <CircleDollarSign className="h-4 w-4" />
-                Expenses
-              </TabsTrigger>
-            </TabsList>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant={currentView === "list" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentView("list")}
-                className="h-8"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={currentView === "calendar" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentView("calendar")}
-                className="h-8"
-              >
-                <CalendarDays className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="grid w-[400px] grid-cols-2">
+            <TabsTrigger value="list">
+              <List className="h-4 w-4 mr-2" />
+              List View
+            </TabsTrigger>
+            <TabsTrigger value="calendar">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Calendar View
+            </TabsTrigger>
+          </TabsList>
 
-          <TabsContent value="bills">
+          <TabsContent value="list">
             <Card>
               <CardHeader>
-                <CardTitle>Bills</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Bills & Expenses</CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleBulkExpenses}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Multiple
+                    </Button>
+                    <Button onClick={() => router.push('/bills/expenses')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New
+                    </Button>
+                  </div>
+                </div>
                 <CardDescription>
-                  Manage your recurring bills and subscription payments
+                  Manage your recurring bills and one-time expenses
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -409,7 +401,7 @@ export default function BillsPage() {
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => handleEditBill(bill)}>
-                                <Calendar className="h-4 w-4 mr-2 text-blue-500" />
+                                <CalendarIcon className="h-4 w-4 mr-2 text-blue-500" />
                                 Edit Bill
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteBill(bill.id)}>
@@ -427,82 +419,58 @@ export default function BillsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="expenses">
+          <TabsContent value="calendar">
             <Card>
               <CardHeader>
-                <CardTitle>Expenses</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Monthly Calendar View</CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleBulkExpenses}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Multiple
+                    </Button>
+                    <Button onClick={() => router.push('/bills/expenses')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New
+                    </Button>
+                  </div>
+                </div>
                 <CardDescription>
-                  Track one-time or variable expenses
+                  View your bills and expenses on a calendar
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {filteredExpenses.length === 0 ? (
-                  <div className="text-center py-10">
-                    <Wallet className="mx-auto h-12 w-12 text-muted-foreground opacity-20" />
-                    <h3 className="mt-4 text-lg font-semibold">No expenses found</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {filterText ? "Try a different search term" : "Add your first expense to get started"}
+                <div className="flex flex-col space-y-4">
+                  <div className="rounded-md border p-4">
+                    <CalendarIcon className="h-32 w-32 mx-auto text-muted-foreground/20" />
+                    <p className="text-center mt-4 text-muted-foreground">
+                      Calendar view coming soon...
                     </p>
-                    {!filterText && (
-                      <Button
-                        variant="link"
-                        onClick={() => handleOpenSetupGuide("expenses")}
-                        className="mt-2"
-                      >
-                        Add your first expense
-                      </Button>
-                    )}
                   </div>
-                ) : (
                   <div className="space-y-4">
+                    {/* Group and display expenses by date */}
                     {filteredExpenses.map((expense) => (
                       <div
                         key={expense.id}
-                        className="flex items-center justify-between p-4 rounded-lg border"
+                        className="flex items-center justify-between p-4 border rounded-lg"
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{expense.name}</p>
-                            <Badge variant="outline">{expense.category}</Badge>
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{expense.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {format(new Date(expense.date), 'PPP')}
+                            </span>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(expense.date)}
-                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="text-lg font-medium">
                             {formatCurrency(expense.amount)}
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Filter className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  // Handle edit expense
-                                }}
-                              >
-                                <Calendar className="h-4 w-4 mr-2 text-blue-500" />
-                                Edit Expense
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  // Handle delete expense
-                                }}
-                              >
-                                <Wallet className="h-4 w-4 mr-2 text-red-500" />
-                                Delete Expense
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

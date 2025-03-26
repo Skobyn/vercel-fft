@@ -14,6 +14,61 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { useTheme } from "next-themes";
+import { 
+  BarChart3, 
+  CalendarDays, 
+  CreditCard, 
+  DollarSign, 
+  Home, 
+  PiggyBank, 
+  Settings, 
+  Target, 
+  Wallet 
+} from "lucide-react";
+
+export const mainNavItems = [
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: <Home className="h-4 w-4" />,
+  },
+  {
+    title: "Bills & Expenses",
+    href: "/bills",
+    icon: <CreditCard className="h-4 w-4" />,
+  },
+  {
+    title: "Income",
+    href: "/income",
+    icon: <DollarSign className="h-4 w-4" />,
+  },
+  {
+    title: "Budgets",
+    href: "/budgets",
+    icon: <PiggyBank className="h-4 w-4" />,
+  },
+  {
+    title: "Goals",
+    href: "/goals",
+    icon: <Target className="h-4 w-4" />,
+  },
+  {
+    title: "Reports",
+    href: "/reports",
+    icon: <BarChart3 className="h-4 w-4" />,
+  },
+  {
+    title: "Calendar",
+    href: "/calendar",
+    icon: <CalendarDays className="h-4 w-4" />,
+    description: "View spending activity across days and weeks",
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: <Settings className="h-4 w-4" />,
+  },
+];
 
 export function MainNav() {
   const pathname = usePathname();
