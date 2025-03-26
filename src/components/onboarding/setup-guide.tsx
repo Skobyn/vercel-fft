@@ -49,6 +49,7 @@ import { useFinancialData } from '@/hooks/use-financial-data';
 import AddIncomeForm from '../forms/add-income-form';
 import AddExpenseForm from '../forms/add-expense-form';
 import UpdateBalanceForm from '../forms/update-balance-form';
+import { FinancialService } from '@/services/financial-service';
 
 interface SetupGuideProps {
   onClose?: () => void;
@@ -192,15 +193,28 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
     if (!user) return;
     
     try {
-      await addExpense(data);
+      // Format the expense as a bill
+      const billData = {
+        name: data.name,
+        amount: data.amount,
+        frequency: data.frequency,
+        category: data.category,
+        dueDate: new Date().toISOString(), // Set due date to current date
+        isPaid: false,
+        autoPay: false,
+        notes: '',
+      };
+      
+      // Use the financial service to add a bill instead of an expense
+      await FinancialService.addBill(billData, user.uid);
       
       // Mark this step as completed
       markStepComplete("expenses");
       
-      toast.success(`${data.name} has been added to your expenses`);
+      toast.success(`${data.name} has been added to your bills`);
     } catch (error) {
-      console.error('Error adding expense:', error);
-      toast.error("Failed to add expense. Please try again.");
+      console.error('Error adding expense as bill:', error);
+      toast.error("Failed to add bill. Please try again.");
     }
   };
 

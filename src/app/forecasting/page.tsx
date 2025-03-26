@@ -24,7 +24,8 @@ import {
   Edit,
   Check,
   CalendarClock,
-  CreditCard
+  CreditCard,
+  CalendarCheck
 } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
@@ -40,6 +41,11 @@ import {
 } from "@/components/ui/dialog";
 import { ForecastChart } from "@/components/reports/forecast-chart";
 import { useAuth } from "@/providers/firebase-auth-provider";
+import { useFinancialData } from "@/hooks/use-financial-data";
+import { generateCashFlowForecast } from "@/utils/financial-utils";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { formatCurrency } from "@/utils/financial-utils";
+import { ForecastItem } from "@/types/financial";
 
 // Types for our forecast data
 type ExpectedIncome = {
@@ -82,6 +88,13 @@ type MonthlyForecast = {
 export default function ForecastingPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { profile, incomes, bills, loading: dataLoading } = useFinancialData();
+  const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
+
+  const [forecastPeriod, setForecastPeriod] = useState<string>("3m");
+  const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState<boolean>(true);
+  const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);
+  const [openAddExpenseDialog, setOpenAddExpenseDialog] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -89,257 +102,119 @@ export default function ForecastingPage() {
     }
   }, [loading, user, router]);
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // Generate forecast data when dependencies change
+  useEffect(() => {
+    if (loading || dataLoading || !profile?.profile) return;
+
+    try {
+      const days = forecastPeriod === "1m" ? 30 : 
+                   forecastPeriod === "3m" ? 90 :
+                   forecastPeriod === "6m" ? 180 : 365;
+      
+      // Generate forecast data using the utility function
+      const forecast = generateCashFlowForecast(
+        profile.profile.currentBalance,
+        incomes,
+        bills,
+        [], // No balance adjustments for this view
+        days
+      );
+      
+      setForecastData(forecast);
+    } catch (error) {
+      console.error("Error generating forecast:", error);
+      // Create minimal forecast with current balance as fallback
+      if (profile?.profile) {
+        setForecastData([{
+          itemId: 'initial-balance',
+          date: new Date().toISOString(),
+          amount: profile.profile.currentBalance || 0,
+          category: 'balance',
+          name: 'Current Balance',
+          type: 'balance',
+          runningBalance: profile.profile.currentBalance || 0
+        }]);
+      }
+    }
+  }, [forecastPeriod, profile, incomes, bills, loading, dataLoading]);
+
+  if (loading || dataLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-muted-foreground">Loading your financial data...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
   }
 
   if (!user) {
     return null;
   }
 
-  const [forecastPeriod, setForecastPeriod] = useState<string>("3m");
-  const [includeOptionalExpenses, setIncludeOptionalExpenses] = useState<boolean>(true);
-  const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);
-  const [openAddExpenseDialog, setOpenAddExpenseDialog] = useState(false);
+  // Calculate totals based on the forecast data
+  const getPeriodTotals = () => {
+    if (!forecastData.length) {
+      return {
+        projectedIncome: "0.00",
+        projectedExpenses: "0.00",
+        endingBalance: profile?.profile?.currentBalance?.toFixed(2) || "0.00"
+      };
+    }
 
-  // Mock data - in a real app, this would come from an API or user input
-  const expectedIncomes: ExpectedIncome[] = [
-    {
-      id: 1,
-      name: "Primary Salary",
-      amount: 4200.00,
-      frequency: "monthly",
-      date: "2025-04-15",
-      isPredicted: false,
-    },
-    {
-      id: 2,
-      name: "Side Project",
-      amount: 800.00,
-      frequency: "monthly",
-      date: "2025-04-20",
-      isPredicted: false,
-    },
-    {
-      id: 3,
-      name: "Tax Refund",
-      amount: 1500.00,
-      frequency: "once",
-      date: "2025-05-10",
-      isPredicted: true,
-    },
-  ];
+    // Get starting balance (current balance)
+    const startingBalance = profile?.profile?.currentBalance || 0;
+    
+    // Calculate projected income (sum of all positive amounts)
+    const projectedIncome = forecastData
+      .filter(item => item.type === 'income')
+      .reduce((sum, item) => sum + item.amount, 0);
+    
+    // Calculate projected expenses (sum of all negative amounts)
+    let projectedExpenses = forecastData
+      .filter(item => item.type === 'expense')
+      .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    
+    // If not including optional expenses, reduce the total
+    if (!includeOptionalExpenses) {
+      // Exclude optional expenses (we'll assume all expenses with category 'Entertainment' or 'Personal' are optional)
+      const optionalCategories = ['Entertainment', 'Personal', 'Dining', 'Shopping'];
+      const optionalExpenses = forecastData
+        .filter(item => item.type === 'expense' && optionalCategories.includes(item.category))
+        .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      
+      projectedExpenses -= optionalExpenses;
+    }
+    
+    // Get ending balance (last item's running balance)
+    const endingBalance = forecastData.length > 0 
+      ? forecastData[forecastData.length - 1].runningBalance || startingBalance
+      : startingBalance;
+    
+    return {
+      projectedIncome: projectedIncome.toFixed(2),
+      projectedExpenses: projectedExpenses.toFixed(2),
+      endingBalance: endingBalance.toFixed(2)
+    };
+  };
 
-  const mandatoryExpenses: MandatoryExpense[] = [
-    {
-      id: 1,
-      name: "Mortgage",
-      amount: 1200.00,
-      frequency: "monthly",
-      date: "2025-04-01",
-      category: "Housing",
-      isPredicted: false,
-    },
-    {
-      id: 2,
-      name: "Electricity",
-      amount: 85.50,
-      frequency: "monthly",
-      date: "2025-04-15",
-      category: "Utilities",
-      isPredicted: false,
-    },
-    {
-      id: 3,
-      name: "Internet",
-      amount: 69.99,
-      frequency: "monthly",
-      date: "2025-04-05",
-      category: "Utilities",
-      isPredicted: false,
-    },
-    {
-      id: 4,
-      name: "Car Insurance",
-      amount: 450.00,
-      frequency: "quarterly",
-      date: "2025-05-15",
-      category: "Insurance",
-      isPredicted: false,
-    },
-    {
-      id: 5,
-      name: "Property Tax",
-      amount: 2400.00,
-      frequency: "annual",
-      date: "2025-11-01",
-      category: "Taxes",
-      isPredicted: true,
-    },
-  ];
+  // Format the data for the chart
+  const getForecastChartData = () => {
+    return forecastData.map(item => ({
+      date: new Date(item.date).toLocaleDateString(),
+      balance: item.runningBalance || 0,
+      income: item.type === 'income' ? item.amount : 0,
+      mandatoryExpenses: item.type === 'expense' && !['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category) ? Math.abs(item.amount) : 0,
+      optionalExpenses: item.type === 'expense' && ['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category) ? Math.abs(item.amount) : 0,
+      projectedBalance: item.runningBalance || 0
+    }));
+  };
 
-  const optionalExpenses: OptionalExpense[] = [
-    {
-      id: 1,
-      name: "Dining Out",
-      amount: 350.00,
-      category: "Food & Dining",
-      likelihood: 90,
-      isPriority: false,
-    },
-    {
-      id: 2,
-      name: "Entertainment",
-      amount: 150.00,
-      category: "Entertainment",
-      likelihood: 75,
-      isPriority: false,
-    },
-    {
-      id: 3,
-      name: "Home Repair",
-      amount: 800.00,
-      category: "Housing",
-      likelihood: 50,
-      isPriority: true,
-    },
-    {
-      id: 4,
-      name: "Vacation",
-      amount: 1200.00,
-      category: "Travel",
-      likelihood: 60,
-      isPriority: true,
-    },
-  ];
-
-  // Mock forecast data based on the above
-  const monthlyForecasts: MonthlyForecast[] = [
-    {
-      month: "April 2025",
-      startingBalance: 5250.75,
-      income: 5000.00,
-      mandatoryExpenses: 1355.49,
-      optionalExpenses: 500.00,
-      endingBalance: 8395.26,
-    },
-    {
-      month: "May 2025",
-      startingBalance: 8395.26,
-      income: 6500.00,
-      mandatoryExpenses: 1805.49,
-      optionalExpenses: 500.00,
-      endingBalance: 12589.77,
-    },
-    {
-      month: "June 2025",
-      startingBalance: 12589.77,
-      income: 5000.00,
-      mandatoryExpenses: 1355.49,
-      optionalExpenses: 2000.00,
-      endingBalance: 14234.28,
-    },
-  ];
-
-  // Sample data for the forecast chart
-  const forecastChartData = [
-    {
-      date: "2025-03-25", // Today
-      balance: 5250.75,
-      income: 0,
-      mandatoryExpenses: 0,
-      optionalExpenses: 0,
-      projectedBalance: 5250.75,
-    },
-    {
-      date: "2025-04-01",
-      balance: 5250.75,
-      income: 0,
-      mandatoryExpenses: 1200.00, // Mortgage
-      optionalExpenses: 0,
-      projectedBalance: 4050.75,
-    },
-    {
-      date: "2025-04-05",
-      balance: 4050.75,
-      income: 0,
-      mandatoryExpenses: 69.99, // Internet
-      optionalExpenses: 0,
-      projectedBalance: 3980.76,
-    },
-    {
-      date: "2025-04-15",
-      balance: 3980.76,
-      income: 4200.00, // Primary Salary
-      mandatoryExpenses: 85.50, // Electricity
-      optionalExpenses: 0,
-      projectedBalance: 8095.26,
-    },
-    {
-      date: "2025-04-20",
-      balance: 8095.26,
-      income: 800.00, // Side Project
-      mandatoryExpenses: 0,
-      optionalExpenses: 500.00, // Entertainment + Dining
-      projectedBalance: 8395.26,
-    },
-    {
-      date: "2025-05-01",
-      balance: 8395.26,
-      income: 0,
-      mandatoryExpenses: 1200.00, // Mortgage
-      optionalExpenses: 0,
-      projectedBalance: 7195.26,
-    },
-    {
-      date: "2025-05-10",
-      balance: 7195.26,
-      income: 1500.00, // Tax Refund
-      mandatoryExpenses: 0,
-      optionalExpenses: 0,
-      projectedBalance: 8695.26,
-    },
-    {
-      date: "2025-05-15",
-      balance: 8695.26,
-      income: 4200.00, // Primary Salary
-      mandatoryExpenses: 535.50, // Electricity + Car Insurance
-      optionalExpenses: 0,
-      projectedBalance: 12359.76,
-    },
-    {
-      date: "2025-05-20",
-      balance: 12359.76,
-      income: 800.00, // Side Project
-      mandatoryExpenses: 0,
-      optionalExpenses: 500.00, // Entertainment + Dining
-      projectedBalance: 12659.76,
-    },
-    {
-      date: "2025-06-01",
-      balance: 12659.76,
-      income: 0,
-      mandatoryExpenses: 1200.00, // Mortgage
-      optionalExpenses: 0,
-      projectedBalance: 11459.76,
-    },
-    {
-      date: "2025-06-15",
-      balance: 11459.76,
-      income: 4200.00, // Primary Salary
-      mandatoryExpenses: 155.49, // Electricity + Internet
-      optionalExpenses: 0,
-      projectedBalance: 15504.27,
-    },
-    {
-      date: "2025-06-20",
-      balance: 15504.27,
-      income: 800.00, // Side Project
-      mandatoryExpenses: 0,
-      optionalExpenses: 2000.00, // Vacation + Entertainment + Dining
-      projectedBalance: 14304.27,
-    },
-  ];
+  const totals = getPeriodTotals();
+  const chartData = getForecastChartData();
 
   // Calculate the forecast period end date
   const getEndDateLabel = () => {
@@ -356,24 +231,6 @@ export default function ForecastingPage() {
     date.setMonth(date.getMonth() + months);
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
-
-  // Calculate totals based on the forecast period
-  const getPeriodTotals = () => {
-    const months = forecastPeriod === "1m" ? 1 : forecastPeriod === "3m" ? 3 : forecastPeriod === "6m" ? 6 : 12;
-
-    // In a real implementation, this would calculate based on actual frequencies and dates
-    const projectedIncome = months * 5000;
-    const projectedExpenses = months * (includeOptionalExpenses ? 1855.49 : 1355.49);
-    const endingBalance = 5250.75 + projectedIncome - projectedExpenses;
-
-    return {
-      projectedIncome: projectedIncome.toFixed(2),
-      projectedExpenses: projectedExpenses.toFixed(2),
-      endingBalance: endingBalance.toFixed(2)
-    };
-  };
-
-  const totals = getPeriodTotals();
 
   return (
     <MainLayout>
@@ -404,14 +261,14 @@ export default function ForecastingPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Starting Balance</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$5,250.75</div>
+              <div className="text-2xl font-bold">{formatCurrency(profile?.profile?.currentBalance || 0)}</div>
               <p className="text-xs text-muted-foreground">As of today</p>
             </CardContent>
           </Card>
@@ -467,11 +324,22 @@ export default function ForecastingPage() {
             </div>
           </CardHeader>
           <CardContent className="h-80">
-            <ForecastChart
-              data={forecastChartData}
-              includeOptionalExpenses={includeOptionalExpenses}
-              className="h-full w-full"
-            />
+            {chartData.length > 0 ? (
+              <ForecastChart
+                data={chartData}
+                includeOptionalExpenses={includeOptionalExpenses}
+                className="h-full w-full"
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center">
+                  <CalendarCheck className="h-12 w-12 mx-auto text-muted-foreground/30" />
+                  <p className="mt-2 text-muted-foreground">
+                    Add income and expenses to see your forecast
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -487,43 +355,43 @@ export default function ForecastingPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {monthlyForecasts.map((forecast, index) => (
+                {forecastData.map((item, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium">{forecast.month}</h4>
+                      <h4 className="font-medium">{item.name}</h4>
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-semibold ${
-                          forecast.income - forecast.mandatoryExpenses - (includeOptionalExpenses ? forecast.optionalExpenses : 0) >= 0
+                          item.amount >= 0
                             ? 'text-emerald-500'
                             : 'text-rose-500'
                         }`}>
-                          Net: ${(forecast.income - forecast.mandatoryExpenses - (includeOptionalExpenses ? forecast.optionalExpenses : 0)).toFixed(2)}
+                          {item.amount >= 0 ? `+${item.amount.toFixed(2)}` : item.amount.toFixed(2)}
                         </span>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Starting: <span className="font-medium">${forecast.startingBalance.toFixed(2)}</span></p>
-                        <p className="text-muted-foreground">Income: <span className="font-medium text-emerald-500">+${forecast.income.toFixed(2)}</span></p>
+                        <p className="text-muted-foreground">Starting: <span className="font-medium">${item.runningBalance?.toFixed(2) || "0.00"}</span></p>
+                        <p className="text-muted-foreground">Income: <span className="font-medium text-emerald-500">+{item.amount >= 0 ? item.amount.toFixed(2) : ""}</span></p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Mandatory: <span className="font-medium text-rose-500">-${forecast.mandatoryExpenses.toFixed(2)}</span></p>
+                        <p className="text-muted-foreground">Mandatory: <span className="font-medium text-rose-500">-{Math.abs(item.amount).toFixed(2)}</span></p>
                         {includeOptionalExpenses && (
-                          <p className="text-muted-foreground">Optional: <span className="font-medium text-amber-500">-${forecast.optionalExpenses.toFixed(2)}</span></p>
+                          <p className="text-muted-foreground">Optional: <span className="font-medium text-amber-500">-{Math.abs(item.amount).toFixed(2)}</span></p>
                         )}
                       </div>
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                       <div
                         className="h-2 rounded-full bg-primary"
-                        style={{ width: `${Math.min(100, (forecast.endingBalance / (forecast.startingBalance + forecast.income)) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (item.runningBalance || 0 / (item.runningBalance || 0 + item.amount)) * 100)}%` }}
                       />
                     </div>
                     <div className="flex justify-between text-xs">
                       <span>Ending Balance: <span className="font-medium">${(
                         includeOptionalExpenses
-                          ? forecast.endingBalance
-                          : forecast.endingBalance + forecast.optionalExpenses
+                          ? item.runningBalance || 0
+                          : item.runningBalance || 0 + item.amount
                       ).toFixed(2)}</span></span>
                     </div>
                   </div>
@@ -594,7 +462,7 @@ export default function ForecastingPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {expectedIncomes.map((income) => (
+                  {incomes.map((income) => (
                     <div key={income.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -707,7 +575,7 @@ export default function ForecastingPage() {
                       </div>
 
                       <div className="max-h-80 overflow-y-auto space-y-4">
-                        {mandatoryExpenses.map((expense) => (
+                        {bills.map((expense) => (
                           <div key={expense.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
