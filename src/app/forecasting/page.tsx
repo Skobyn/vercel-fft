@@ -937,8 +937,7 @@ export default function ForecastingPage() {
                         </div>
                         <Progress
                           value={isPositiveCashflow ? 100 : (month.income / (month.mandatoryExpenses + month.optionalExpenses + 0.01)) * 100}
-                          className={`h-2 ${isPositiveCashflow ? 'bg-emerald-100' : 'bg-rose-100'}`}
-                          indicatorClassName={isPositiveCashflow ? 'bg-emerald-500' : 'bg-rose-500'}
+                          className={`h-2 ${isPositiveCashflow ? 'bg-emerald-100' : 'bg-rose-100'} [&>div]:${isPositiveCashflow ? 'bg-emerald-500' : 'bg-rose-500'}`}
                         />
                       </div>
                     );
