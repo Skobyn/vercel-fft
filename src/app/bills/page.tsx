@@ -168,7 +168,15 @@ export default function BillsPage() {
         for (const bill of items) {
           if (bill.id) {
             // Update existing bill
-            await updateBill({...bill, id: bill.id});
+            const processedValues = {
+              ...bill,
+              id: bill.id,
+              dueDate: bill.dueDate,
+              endDate: bill.endDate ? bill.endDate.toISOString() : undefined,
+              amount: Number(bill.amount),
+              isRecurring: bill.frequency !== 'once',
+            };
+            await updateBill(processedValues);
           } else {
             // Add new bill
             await addBill(bill);
@@ -515,6 +523,9 @@ export default function BillsPage() {
                     ...values,
                     id: currentBill.id,
                     dueDate: values.dueDate.toISOString(),
+                    endDate: values.endDate ? values.endDate.toISOString() : undefined,
+                    amount: Number(values.amount),
+                    isRecurring: values.frequency !== 'once',
                     frequency
                   };
                   updateBill(processedValues);
@@ -526,6 +537,9 @@ export default function BillsPage() {
                   const processedValues = {
                     ...values,
                     dueDate: values.dueDate.toISOString(),
+                    endDate: values.endDate ? values.endDate.toISOString() : undefined,
+                    amount: Number(values.amount),
+                    isRecurring: values.frequency !== 'once',
                     frequency
                   };
                   addBill(processedValues);

@@ -121,6 +121,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
           currentBalance,
           incomesArray,
           billsArray,
+          [], // No expenses for now
           [], // No balance adjustments for now
           days
         );

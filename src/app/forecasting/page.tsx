@@ -84,6 +84,18 @@ type MonthlyForecast = {
   mandatoryExpenses: number;
   optionalExpenses: number;
   endingBalance: number;
+  scenarioIncome?: number;
+  scenarioMandatoryExpenses?: number;
+  scenarioOptionalExpenses?: number;
+  scenarioEndingBalance?: number;
+};
+
+// Add these types near the top with other type definitions
+type BalanceEdit = {
+  date: string;
+  oldBalance: number;
+  newBalance: number;
+  note?: string;
 };
 
 export default function ForecastingPage() {
@@ -139,6 +151,11 @@ export default function ForecastingPage() {
   const [savingsAdjustment, setSavingsAdjustment] = useState(0);
   const [unexpectedExpense, setUnexpectedExpense] = useState(0);
   const [unexpectedExpenseDate, setUnexpectedExpenseDate] = useState<Date | undefined>(undefined);
+  const [scenarioForecast, setScenarioForecast] = useState<ForecastItem[]>([]);
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
+  const [newBalance, setNewBalance] = useState<number>(0);
+  const [balanceNote, setBalanceNote] = useState<string>("");
+  const [balanceEdits, setBalanceEdits] = useState<BalanceEdit[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -179,6 +196,7 @@ export default function ForecastingPage() {
         currentBalance,
         incomesArray,
         billsArray,
+        financialData.expensesData || [], // Add expenses
         [], // No balance adjustments for this view
         days
       );
@@ -194,7 +212,7 @@ export default function ForecastingPage() {
       setForecastData(forecast);
       
       // Generate monthly breakdown from forecast data
-      generateMonthlyBreakdown(forecast);
+      generateMonthlyBreakdown(forecast, scenarioForecast);
     } catch (error) {
       console.error("Error generating forecast:", error);
       // Create a minimal forecast with just the current balance
@@ -208,49 +226,88 @@ export default function ForecastingPage() {
         runningBalance: financialData.profileData.currentBalance || 0
       }];
       setForecastData(minimalForecast);
-      generateMonthlyBreakdown(minimalForecast);
+      generateMonthlyBreakdown(minimalForecast, scenarioForecast);
     }
-  }, [forecastPeriod, financialData, authLoading, forecastData.length]);
+  }, [forecastPeriod, financialData, authLoading, forecastData.length, scenarioForecast]);
 
   // Function to generate monthly breakdown from forecast data
-  const generateMonthlyBreakdown = (forecast: ForecastItem[]) => {
-    // Group forecast items by month
+  const generateMonthlyBreakdown = (forecast: ForecastItem[], scenarioForecast?: ForecastItem[]) => {
+    // Initialize 12 months of data
     const months: Record<string, MonthlyForecast> = {};
+    const now = new Date();
     
-    // Initialize each month with zeros
-    forecast.forEach(item => {
-      const date = new Date(item.date);
+    // Pre-initialize 12 months
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
       const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       
-      if (!months[monthKey]) {
-        months[monthKey] = {
-          month: monthName,
-          startingBalance: 0,
-          income: 0,
-          mandatoryExpenses: 0,
-          optionalExpenses: 0,
-          endingBalance: 0
-        };
-      }
+      months[monthKey] = {
+        month: monthName,
+        startingBalance: i === 0 ? (financialData.profileData?.currentBalance || 0) : 0,
+        income: 0,
+        mandatoryExpenses: 0,
+        optionalExpenses: 0,
+        endingBalance: 0
+      };
+    }
+    
+    // Process baseline forecast
+    forecast.forEach(item => {
+      const date = new Date(item.date);
+      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
       
-      // Add values based on type
-      if (item.type === 'income') {
-        months[monthKey].income += item.amount;
-      } else if (item.type === 'expense') {
-        // Check if it's an optional expense
-        if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
-          months[monthKey].optionalExpenses += Math.abs(item.amount);
-        } else {
-          months[monthKey].mandatoryExpenses += Math.abs(item.amount);
+      if (months[monthKey]) {
+        if (item.type === 'income') {
+          months[monthKey].income += item.amount;
+        } else if (item.type === 'expense' || item.type === 'bill') {
+          if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
+            months[monthKey].optionalExpenses += Math.abs(item.amount);
+          } else {
+            months[monthKey].mandatoryExpenses += Math.abs(item.amount);
+          }
         }
       }
     });
     
-    // Calculate ending balance for each month (net cashflow)
+    // Process scenario forecast if available
+    if (scenarioForecast?.length) {
+      scenarioForecast.forEach(item => {
+        const date = new Date(item.date);
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        
+        if (months[monthKey]) {
+          if (item.type === 'income') {
+            months[monthKey].scenarioIncome = (months[monthKey].scenarioIncome || 0) + item.amount;
+          } else if (item.type === 'expense' || item.type === 'bill') {
+            if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
+              months[monthKey].scenarioOptionalExpenses = (months[monthKey].scenarioOptionalExpenses || 0) + Math.abs(item.amount);
+            } else {
+              months[monthKey].scenarioMandatoryExpenses = (months[monthKey].scenarioMandatoryExpenses || 0) + Math.abs(item.amount);
+            }
+          }
+        }
+      });
+    }
+    
+    // Calculate running balances for both baseline and scenario
+    let runningBalance = financialData.profileData?.currentBalance || 0;
+    let scenarioRunningBalance = financialData.profileData?.currentBalance || 0;
+    
     Object.values(months).forEach(month => {
-      // Set ending balance as the net cashflow
-      month.endingBalance = month.income - month.mandatoryExpenses - (includeOptionalExpenses ? month.optionalExpenses : 0);
+      // Baseline calculations
+      month.startingBalance = runningBalance;
+      month.endingBalance = runningBalance + month.income - month.mandatoryExpenses - (includeOptionalExpenses ? month.optionalExpenses : 0);
+      runningBalance = month.endingBalance;
+      
+      // Scenario calculations if available
+      if (scenarioForecast?.length) {
+        month.scenarioEndingBalance = scenarioRunningBalance + 
+          (month.scenarioIncome || 0) - 
+          (month.scenarioMandatoryExpenses || 0) - 
+          (includeOptionalExpenses ? (month.scenarioOptionalExpenses || 0) : 0);
+        scenarioRunningBalance = month.scenarioEndingBalance;
+      }
     });
     
     // Convert to array and sort by month
@@ -261,7 +318,27 @@ export default function ForecastingPage() {
     setMonthlyBreakdown(monthlyData);
   };
 
-  // Calculate scenario impact on forecasting
+  // Add this function to handle balance updates
+  const handleBalanceUpdate = async () => {
+    if (!user || !financialData.profileData) return;
+
+    const oldBalance = financialData.profileData.currentBalance;
+    const edit: BalanceEdit = {
+      date: new Date().toISOString(),
+      oldBalance,
+      newBalance,
+      note: balanceNote
+    };
+
+    setBalanceEdits(prev => [...prev, edit]);
+    // Here you would also update the balance in your database
+    // await updateBalance(newBalance);
+    
+    setIsEditingBalance(false);
+    setBalanceNote("");
+  };
+
+  // Modify the applyScenario function
   const applyScenario = () => {
     if (authLoading || financialData.loading || !financialData.profileData) return;
     
@@ -292,37 +369,32 @@ export default function ForecastingPage() {
         balanceAdjustments.push({
           id: `unexpected-${Date.now()}`,
           date: unexpectedExpenseDate,
-          amount: -unexpectedExpense, // Negative as it's an outflow
+          amount: -unexpectedExpense,
           category: 'Unexpected',
           name: 'Unexpected Expense',
           type: 'adjustment',
-          previousBalance: 0, // These values will be calculated internally
-          newBalance: 0,
-          reason: 'Unexpected Expense',
-          userId: user?.uid || '', 
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          reason: 'Unexpected Expense'
         });
       }
       
       // Generate forecast with adjusted values
-      const forecast = generateCashFlowForecast(
+      const scenarioForecast = generateCashFlowForecast(
         currentBalance,
         adjustedIncomes,
         adjustedBills,
+        financialData.expensesData || [],
         balanceAdjustments,
-        days
+        365 // Always generate 12 months for monthly breakdown
       );
       
-      setForecastData(forecast);
-      generateMonthlyBreakdown(forecast);
+      setScenarioForecast(scenarioForecast);
     } catch (error) {
       console.error("Error applying scenario:", error);
       toast.error("Failed to apply scenario adjustments");
     }
   };
   
-  // Reset scenario to default
+  // Modify the resetScenario function
   const resetScenario = () => {
     setIncomeAdjustment(0);
     setExpensesAdjustment(0);
@@ -330,24 +402,7 @@ export default function ForecastingPage() {
     setUnexpectedExpense(0);
     setUnexpectedExpenseDate(undefined);
     setScenarioName("Default Scenario");
-    
-    // Regenerate the forecast with original values
-    const days = forecastPeriod === "1m" ? 30 : 
-               forecastPeriod === "3m" ? 90 :
-               forecastPeriod === "6m" ? 180 : 365;
-    
-    if (financialData.profileData) {
-      const forecast = generateCashFlowForecast(
-        financialData.profileData.currentBalance || 0,
-        financialData.incomesData || [],
-        financialData.billsData || [],
-        [],
-        days
-      );
-      
-      setForecastData(forecast);
-      generateMonthlyBreakdown(forecast);
-    }
+    setScenarioForecast([]);
   };
 
   if (authLoading || financialData.loading) {
@@ -476,12 +531,25 @@ export default function ForecastingPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Starting Balance</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4"
+                  onClick={() => {
+                    setNewBalance(financialData.profileData?.currentBalance || 0);
+                    setIsEditingBalance(true);
+                  }}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(financialData.profileData?.currentBalance || 0)}</div>
-              <p className="text-xs text-muted-foreground">As of today</p>
+              <p className="text-xs text-muted-foreground">Last updated: {new Date(financialData.profileData?.lastUpdated || Date.now()).toLocaleDateString()}</p>
             </CardContent>
           </Card>
           <Card>
@@ -490,7 +558,14 @@ export default function ForecastingPage() {
               <ArrowUp className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totals.projectedIncome}</div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">${totals.projectedIncome}</div>
+                {scenarioForecast.length > 0 && (
+                  <div className="text-sm text-emerald-500">
+                    ${(parseFloat(totals.projectedIncome) * (1 + incomeAdjustment / 100)).toFixed(2)} (Scenario)
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">Next {forecastPeriod === "1m" ? "month" : forecastPeriod === "12m" ? "year" : forecastPeriod.replace("m", " months")}</p>
             </CardContent>
           </Card>
@@ -500,7 +575,14 @@ export default function ForecastingPage() {
               <ArrowDown className="h-4 w-4 text-rose-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totals.projectedExpenses}</div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">${totals.projectedExpenses}</div>
+                {scenarioForecast.length > 0 && (
+                  <div className="text-sm text-rose-500">
+                    ${(parseFloat(totals.projectedExpenses) * (1 + expensesAdjustment / 100)).toFixed(2)} (Scenario)
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">Next {forecastPeriod === "1m" ? "month" : forecastPeriod === "12m" ? "year" : forecastPeriod.replace("m", " months")}</p>
             </CardContent>
           </Card>
@@ -510,7 +592,14 @@ export default function ForecastingPage() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${totals.endingBalance}</div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">${totals.endingBalance}</div>
+                {scenarioForecast.length > 0 && (
+                  <div className="text-sm text-emerald-500">
+                    ${scenarioForecast[scenarioForecast.length - 1]?.runningBalance?.toFixed(2) ?? 0} (Scenario)
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">Projected for {getEndDateLabel()}</p>
             </CardContent>
           </Card>
@@ -536,10 +625,10 @@ export default function ForecastingPage() {
             </div>
           </CardHeader>
           <CardContent className="h-80">
-            {chartData.length > 0 ? (
+            {forecastData.length > 0 ? (
               <ForecastChart
-                data={chartData}
-                includeOptionalExpenses={includeOptionalExpenses}
+                baselineData={forecastData}
+                scenarioData={scenarioForecast}
                 className="h-full w-full"
               />
             ) : (
@@ -561,7 +650,7 @@ export default function ForecastingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Monthly Breakdown</CardTitle>
-                  <CardDescription>Net cashflow by month</CardDescription>
+                  <CardDescription>Net cashflow by month for the next 12 months</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -577,6 +666,8 @@ export default function ForecastingPage() {
                 ) : (
                   monthlyBreakdown.map((month, index) => {
                     const isPositiveCashflow = month.endingBalance >= 0;
+                    const isScenarioPositive = month.scenarioEndingBalance ? month.scenarioEndingBalance >= 0 : true;
+                    
                     return (
                       <div key={index} className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -589,14 +680,39 @@ export default function ForecastingPage() {
                             }`}>
                               {isPositiveCashflow ? '+' : ''}{formatCurrency(month.endingBalance)}
                             </span>
+                            {month.scenarioEndingBalance !== undefined && (
+                              <span className={`text-sm font-semibold ${
+                                isScenarioPositive
+                                  ? 'text-emerald-500'
+                                  : 'text-rose-500'
+                              }`}>
+                                ({isScenarioPositive ? '+' : ''}{formatCurrency(month.scenarioEndingBalance)})
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div>
-                            <p className="text-muted-foreground">Income: <span className="font-medium text-emerald-500">+{formatCurrency(month.income)}</span></p>
+                            <p className="text-muted-foreground">
+                              Income: <span className="font-medium text-emerald-500">+{formatCurrency(month.income)}</span>
+                              {month.scenarioIncome !== undefined && (
+                                <span className="text-emerald-500 ml-1">
+                                  (+{formatCurrency(month.scenarioIncome)})
+                                </span>
+                              )}
+                            </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Expenses: <span className="font-medium text-rose-500">-{formatCurrency(month.mandatoryExpenses + (includeOptionalExpenses ? month.optionalExpenses : 0))}</span></p>
+                            <p className="text-muted-foreground">
+                              Expenses: <span className="font-medium text-rose-500">
+                                -{formatCurrency(month.mandatoryExpenses + (includeOptionalExpenses ? month.optionalExpenses : 0))}
+                              </span>
+                              {month.scenarioMandatoryExpenses !== undefined && (
+                                <span className="text-rose-500 ml-1">
+                                  (-{formatCurrency(month.scenarioMandatoryExpenses + (includeOptionalExpenses ? (month.scenarioOptionalExpenses || 0) : 0))})
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                         <div className="mt-1">
@@ -607,13 +723,29 @@ export default function ForecastingPage() {
                                 width: `${Math.min(100, Math.abs(month.endingBalance) / (month.income || 1) * 100)}%` 
                               }}
                             />
+                            {month.scenarioEndingBalance !== undefined && (
+                              <div
+                                className={`h-2 rounded-full ${isScenarioPositive ? 'bg-emerald-500/50' : 'bg-rose-500/50'}`}
+                                style={{ 
+                                  width: `${Math.min(100, Math.abs(month.scenarioEndingBalance) / (month.scenarioIncome || 1) * 100)}%` 
+                                }}
+                              />
+                            )}
                           </div>
                         </div>
                         {month.optionalExpenses > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
                             {includeOptionalExpenses 
-                              ? `Includes ${formatCurrency(month.optionalExpenses)} in optional expenses` 
-                              : `${formatCurrency(month.optionalExpenses)} in optional expenses not included`}
+                              ? `Includes ${formatCurrency(month.optionalExpenses)} in optional expenses${
+                                  month.scenarioOptionalExpenses !== undefined 
+                                    ? ` (${formatCurrency(month.scenarioOptionalExpenses)} in scenario)`
+                                    : ''
+                                }` 
+                              : `${formatCurrency(month.optionalExpenses)} in optional expenses not included${
+                                  month.scenarioOptionalExpenses !== undefined
+                                    ? ` (${formatCurrency(month.scenarioOptionalExpenses)} in scenario)`
+                                    : ''
+                                }`}
                           </p>
                         )}
                       </div>
@@ -771,6 +903,82 @@ export default function ForecastingPage() {
             </Card>
           </div>
         </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Main forecast chart */}
+          <Card className="col-span-2 h-[400px]">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Cash Flow Forecast</CardTitle>
+                  <CardDescription>
+                    Projected cash flow over the next {forecastPeriod === "1m" ? "month" : forecastPeriod === "3m" ? "3 months" : forecastPeriod === "6m" ? "6 months" : "year"}
+                  </CardDescription>
+                </div>
+                <Select value={forecastPeriod} onValueChange={setForecastPeriod}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Select timeframe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1m">1 Month</SelectItem>
+                    <SelectItem value="3m">3 Months</SelectItem>
+                    <SelectItem value="6m">6 Months</SelectItem>
+                    <SelectItem value="12m">1 Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ForecastChart 
+                  baselineData={forecastData} 
+                  scenarioData={scenarioForecast}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Add balance edit dialog */}
+        <Dialog open={isEditingBalance} onOpenChange={setIsEditingBalance}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Current Balance</DialogTitle>
+              <DialogDescription>
+                Update your current balance and optionally add a note to explain the change.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-balance">New Balance</Label>
+                <Input
+                  id="new-balance"
+                  type="number"
+                  value={newBalance}
+                  onChange={(e) => setNewBalance(parseFloat(e.target.value) || 0)}
+                  step="0.01"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="balance-note">Note (Optional)</Label>
+                <Input
+                  id="balance-note"
+                  value={balanceNote}
+                  onChange={(e) => setBalanceNote(e.target.value)}
+                  placeholder="Reason for the balance update"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditingBalance(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleBalanceUpdate}>
+                Update Balance
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

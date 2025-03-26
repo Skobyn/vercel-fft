@@ -1,159 +1,108 @@
 "use client";
 
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  ReferenceDot
-} from 'recharts';
-import { formatCurrency } from '@/utils/financial-utils';
-import { useState } from 'react';
-
-interface TrendData {
-  date: string;
-  amount: number;
-  movingAverage: number;
-}
+import { useMemo } from "react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { formatCurrency } from "@/utils/financial-utils";
+import { Bill, Expense } from "@/types/financial";
+import { eachDayOfInterval, format, startOfDay, endOfDay } from "date-fns";
 
 interface SpendingTrendsChartProps {
-  data: TrendData[];
+  expenses: (Bill | Expense)[];
+  dateRange: { from: Date; to: Date };
 }
 
-export function SpendingTrendsChart({ data }: SpendingTrendsChartProps) {
-  const [activePoint, setActivePoint] = useState<number | null>(null);
+export function SpendingTrendsChart({ expenses, dateRange }: SpendingTrendsChartProps) {
+  const data = useMemo(() => {
+    const days = eachDayOfInterval({
+      start: dateRange.from,
+      end: dateRange.to
+    });
 
-  const formatYAxis = (value: number): string => {
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(0)}k`;
+    // Get daily spending
+    const dailyData = days.map(day => {
+      const dayStart = startOfDay(day);
+      const dayEnd = endOfDay(day);
+
+      const dailyTotal = expenses
+        .filter(expense => {
+          const date = new Date('date' in expense ? expense.date : expense.dueDate);
+          return date >= dayStart && date <= dayEnd;
+        })
+        .reduce((sum, expense) => sum + expense.amount, 0);
+
+      return {
+        date: format(day, 'MMM dd'),
+        amount: dailyTotal,
+        movingAverage: 0 // Will be calculated below
+      };
+    });
+
+    // Calculate 7-day moving average
+    const windowSize = 7;
+    for (let i = 0; i < dailyData.length; i++) {
+      let sum = 0;
+      let count = 0;
+      
+      for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
+        sum += dailyData[j].amount;
+        count++;
+      }
+
+      dailyData[i].movingAverage = sum / count;
     }
-    return value.toString();
-  };
 
-  const formatXAxis = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
+    return dailyData;
+  }, [expenses, dateRange]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const date = new Date(label);
-      const formattedDate = date.toLocaleDateString(undefined, { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-
       return (
-        <div className="bg-white p-4 rounded-md shadow-lg border">
-          <p className="font-medium">{formattedDate}</p>
-          <p style={{ color: payload[0].color }}>
-            Spending: {formatCurrency(payload[0].value)}
-          </p>
-          <p style={{ color: payload[1].color }}>
-            Trend: {formatCurrency(payload[1].value)}
-          </p>
+        <div className="bg-white p-2 border rounded shadow-sm">
+          <p className="font-medium">{label}</p>
+          <div className="space-y-1 text-sm">
+            <p>
+              Daily Spending: <span className="font-medium">{formatCurrency(payload[0].value)}</span>
+            </p>
+            <p>
+              7-Day Average: <span className="font-medium">{formatCurrency(payload[1].value)}</span>
+            </p>
+          </div>
         </div>
       );
     }
     return null;
   };
 
-  // Find significant points (local maximums/minimums)
-  const findSignificantPoints = () => {
-    const points: number[] = [];
-    
-    // Skip first and last points
-    for (let i = 1; i < data.length - 1; i++) {
-      const prevAmount = data[i-1].amount;
-      const currentAmount = data[i].amount;
-      const nextAmount = data[i+1].amount;
-      
-      // Check if current point is a local maximum or minimum
-      if ((currentAmount > prevAmount && currentAmount > nextAmount) ||
-          (currentAmount < prevAmount && currentAmount < nextAmount)) {
-        points.push(i);
-      }
-    }
-    
-    return points;
-  };
-
-  const significantPoints = findSignificantPoints();
-
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart
-        data={data}
-        margin={{
-          top: 20,
-          right: 30,
-          left: 20,
-          bottom: 5,
-        }}
-        onMouseMove={(e) => {
-          if (e.activeTooltipIndex !== undefined) {
-            setActivePoint(e.activeTooltipIndex);
-          } else {
-            setActivePoint(null);
-          }
-        }}
-        onMouseLeave={() => setActivePoint(null)}
-      >
+      <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
-          dataKey="date" 
-          tickFormatter={formatXAxis} 
-          minTickGap={30}
+        <XAxis
+          dataKey="date"
+          interval={Math.floor(data.length / 10)}
+          angle={-45}
+          textAnchor="end"
+          height={60}
         />
-        <YAxis tickFormatter={formatYAxis} />
+        <YAxis tickFormatter={(value) => formatCurrency(value).split('.')[0]} />
         <Tooltip content={<CustomTooltip />} />
         <Legend />
         <Line
           type="monotone"
           dataKey="amount"
-          name="Spending"
-          stroke="#6366f1"
-          strokeWidth={2}
+          name="Daily Spending"
+          stroke="#ef4444"
           dot={false}
-          activeDot={{ r: 8 }}
+          strokeWidth={2}
         />
         <Line
           type="monotone"
           dataKey="movingAverage"
-          name="Trend"
-          stroke="#e11d48"
-          strokeWidth={2}
-          strokeDasharray="5 5"
+          name="7-Day Average"
+          stroke="#3b82f6"
           dot={false}
+          strokeWidth={2}
         />
-        
-        {/* Highlight significant points */}
-        {significantPoints.map((index) => (
-          <ReferenceDot
-            key={`ref-dot-${index}`}
-            x={data[index].date}
-            y={data[index].amount}
-            r={4}
-            fill="#6366f1"
-            stroke="#fff"
-          />
-        ))}
-        
-        {/* Highlight active point */}
-        {activePoint !== null && (
-          <ReferenceDot
-            x={data[activePoint].date}
-            y={data[activePoint].amount}
-            r={8}
-            fill="#6366f1"
-            stroke="#fff"
-          />
-        )}
       </LineChart>
     </ResponsiveContainer>
   );

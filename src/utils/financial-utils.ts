@@ -46,7 +46,7 @@ export function calculateNextOccurrence(startDate: string, frequency: string): s
 /**
  * Generates all future occurrences of a recurring item for the next specified days
  */
-export function generateOccurrences<T extends { id: string; frequency: string; amount: number }>(
+export function generateOccurrences<T extends { id: string; frequency: string; amount: number; endDate?: string }>(
   item: T, 
   dateField: keyof T, 
   days: number = 90
@@ -63,8 +63,10 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
   }
 
   const occurrences: ForecastItem[] = [];
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + days);
+  const endDate = item.endDate ? new Date(item.endDate) : new Date();
+  if (!item.endDate) {
+    endDate.setDate(endDate.getDate() + days);
+  }
   
   let currentDate = new Date(item[dateField] as string);
   
@@ -92,6 +94,7 @@ export function generateCashFlowForecast(
   currentBalance: number,
   incomes: Income[] = [],
   bills: Bill[] = [],
+  expenses: Expense[] = [],
   balanceAdjustments: BalanceAdjustment[] = [],
   days: number = 90
 ): ForecastItem[] {
@@ -103,12 +106,14 @@ export function generateCashFlowForecast(
     // Ensure arrays are valid and limit their size to prevent processing too much
     const validIncomes = Array.isArray(incomes) ? incomes.slice(0, 100) : [];
     const validBills = Array.isArray(bills) ? bills.slice(0, 100) : [];
+    const validExpenses = Array.isArray(expenses) ? expenses.slice(0, 100) : [];
     const validAdjustments = Array.isArray(balanceAdjustments) ? balanceAdjustments.slice(0, 50) : [];
     
     console.log('Generating forecast with:', {
       balance: normalizedBalance,
       incomes: validIncomes.length,
       bills: validBills.length,
+      expenses: validExpenses.length,
       adjustments: validAdjustments.length,
       days: normalizedDays
     });
@@ -121,7 +126,8 @@ export function generateCashFlowForecast(
       category: 'balance',
       name: 'Current Balance',
       type: 'balance',
-      runningBalance: normalizedBalance
+      runningBalance: normalizedBalance,
+      description: 'Starting balance'
     }];
     
     // Function to safely add items to forecast
@@ -170,7 +176,8 @@ export function generateCashFlowForecast(
         category: income.category || 'Income',
         name: income.name || 'Income',
         type: 'income',
-        runningBalance: 0 // Will be calculated later
+        runningBalance: 0, // Will be calculated later
+        description: `${income.name} (${income.category})${income.isRecurring ? ' - Recurring' : ''}`
       };
     }, 'income');
     
@@ -188,10 +195,28 @@ export function generateCashFlowForecast(
         amount: -Math.abs(bill.amount), // Ensure bills are negative
         category: bill.category || 'Expense',
         name: bill.name || 'Bill',
-        type: 'expense',
-        runningBalance: 0 // Will be calculated later
+        type: 'bill',
+        runningBalance: 0, // Will be calculated later
+        description: `${bill.name} (${bill.category})${bill.isRecurring ? ' - Recurring' : ''} - Due${bill.autoPay ? ' - AutoPay' : ''}`
       };
     }, 'bill');
+
+    // Process expenses
+    safelyAddItems(validExpenses, (expense) => {
+      // Only process valid expense items
+      if (!expense.id || !expense.date || isNaN(expense.amount)) return null;
+      
+      return {
+        itemId: expense.id,
+        date: expense.date,
+        amount: -Math.abs(expense.amount), // Ensure expenses are negative
+        category: expense.category || 'Expense',
+        name: expense.name || 'Expense',
+        type: 'expense',
+        runningBalance: 0, // Will be calculated later
+        description: `${expense.name} (${expense.category})${expense.isPlanned ? ' - Planned' : ' - Unplanned'}`
+      };
+    }, 'expense');
     
     // Process balance adjustments
     safelyAddItems(validAdjustments, (adjustment) => {
@@ -204,7 +229,8 @@ export function generateCashFlowForecast(
         category: 'adjustment',
         name: adjustment.reason || 'Balance Adjustment',
         type: 'adjustment',
-        runningBalance: 0 // Will be calculated later
+        runningBalance: 0, // Will be calculated later
+        description: `Balance adjusted by ${formatCurrency(adjustment.amount)} - ${adjustment.reason || 'No reason provided'}`
       };
     }, 'adjustment');
     
@@ -248,7 +274,8 @@ export function generateCashFlowForecast(
       category: 'balance',
       name: 'Current Balance',
       type: 'balance',
-      runningBalance: isNaN(currentBalance) ? 0 : currentBalance
+      runningBalance: isNaN(currentBalance) ? 0 : currentBalance,
+      description: 'Starting balance'
     }];
   }
 }

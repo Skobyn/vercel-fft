@@ -50,6 +50,7 @@ const billFormSchema = z.object({
   isRecurring: z.boolean().default(false),
   autoPay: z.boolean().default(false),
   notes: z.string().optional(),
+  endDate: z.date().optional(),
 });
 
 type BillFormValues = z.infer<typeof billFormSchema>;
@@ -79,6 +80,7 @@ export default function BillForm({
     isRecurring: bill?.isRecurring ?? bill?.frequency !== 'once',
     autoPay: bill?.autoPay || false,
     notes: bill?.notes || "",
+    endDate: bill?.endDate ? new Date(bill.endDate) : undefined,
   };
 
   const form = useForm<BillFormValues>({
@@ -227,12 +229,11 @@ export default function BillForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="once">One Time</SelectItem>
+                    <SelectItem value="once">Once</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                    <SelectItem value="biweekly">Bi-weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="semiannually">Semi-Annually</SelectItem>
                     <SelectItem value="annually">Annually</SelectItem>
                   </SelectContent>
                 </Select>
@@ -240,6 +241,52 @@ export default function BillForm({
               </FormItem>
             )}
           />
+
+          {form.watch("frequency") !== "once" && (
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>End Date (Optional)</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className="w-full pl-3 text-left font-normal"
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>No end date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                        }}
+                        disabled={(date) =>
+                          date < form.getValues("dueDate") // Can't be before start date
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormDescription>
+                    When this bill will stop recurring
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
           <div className="flex items-center space-x-4 md:col-span-2">
             <FormField

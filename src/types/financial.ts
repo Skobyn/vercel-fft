@@ -29,6 +29,7 @@ export interface Bill extends BaseItem {
   paidDate?: string;
   frequency: 'once' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annually';
   nextDueDate?: string; // Only for recurring bills
+  endDate?: string; // Optional end date for recurring bills
   category: string;
   notes?: string;
   isRecurring: boolean;
@@ -81,6 +82,7 @@ export interface ForecastItem {
   name: string;
   type: 'income' | 'bill' | 'expense' | 'balance' | 'adjustment';
   runningBalance?: number;
+  description?: string;
   transactions?: {
     id: string;
     type: 'income' | 'bill' | 'expense';

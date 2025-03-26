@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -12,20 +13,49 @@ import {
   ReferenceLine
 } from "recharts";
 import { formatCurrency } from '@/utils/financial-utils';
-
-// Define the data structure for the chart
-interface MonthlyBalance {
-  month: string;
-  income: number;
-  expenses: number;
-  savings: number;
-}
+import { Income, Bill, Expense } from "@/types/financial";
+import { startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 
 interface IncomeExpensesChartProps {
-  data: MonthlyBalance[];
+  incomes: Income[];
+  expenses: (Bill | Expense)[];
+  dateRange: { from: Date; to: Date };
 }
 
-export function IncomeExpensesChart({ data }: IncomeExpensesChartProps) {
+export function IncomeExpensesChart({ incomes, expenses, dateRange }: IncomeExpensesChartProps) {
+  const data = useMemo(() => {
+    const months = eachMonthOfInterval({
+      start: startOfMonth(dateRange.from),
+      end: endOfMonth(dateRange.to)
+    });
+
+    return months.map(month => {
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+
+      const monthlyIncome = incomes
+        .filter(income => {
+          const date = new Date(income.date);
+          return date >= monthStart && date <= monthEnd;
+        })
+        .reduce((sum, income) => sum + income.amount, 0);
+
+      const monthlyExpenses = expenses
+        .filter(expense => {
+          const date = new Date('date' in expense ? expense.date : expense.dueDate);
+          return date >= monthStart && date <= monthEnd;
+        })
+        .reduce((sum, expense) => sum + expense.amount, 0);
+
+      return {
+        month: month.toLocaleDateString('default', { month: 'short' }),
+        income: monthlyIncome,
+        expenses: monthlyExpenses,
+        savings: monthlyIncome - monthlyExpenses
+      };
+    });
+  }, [incomes, expenses, dateRange]);
+
   const formatYAxis = (value: number): string => {
     if (value >= 1000) {
       return `${(value / 1000).toFixed(0)}k`;
@@ -73,6 +103,7 @@ export function IncomeExpensesChart({ data }: IncomeExpensesChartProps) {
         <ReferenceLine y={0} stroke="#000" />
         <Bar dataKey="income" name="Income" fill="#4ade80" radius={[4, 4, 0, 0]} />
         <Bar dataKey="expenses" name="Expenses" fill="#f87171" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="savings" name="Savings" fill="#3b82f6" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

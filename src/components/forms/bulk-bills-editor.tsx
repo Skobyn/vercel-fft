@@ -38,6 +38,7 @@ interface BulkRowData {
   category: string;
   frequency: string;
   dueDate?: string; // For bills
+  endDate?: string; // For recurring bills
   date?: string; // For expenses
   isRecurring?: boolean;
   autoPay?: boolean;
@@ -72,6 +73,7 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
         category: "housing",
         frequency: "monthly",
         dueDate: format(new Date(), "yyyy-MM-dd"),
+        endDate: "",
         isRecurring: true,
         autoPay: false,
         isPaid: false,
@@ -142,6 +144,17 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
         continue;
       }
       
+      // Validate end date is after due date for recurring bills
+      if (type === "bills" && row.frequency !== "once" && row.endDate) {
+        const dueDate = new Date(row.dueDate!);
+        const endDate = new Date(row.endDate);
+        if (endDate <= dueDate) {
+          toast.error(`Row ${i + 1}: End date must be after due date`);
+          hasErrors = true;
+          continue;
+        }
+      }
+      
       // Format the row based on type
       const formattedRow: any = {
         name: row.name.trim(),
@@ -156,6 +169,9 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
         formattedRow.isRecurring = row.frequency !== "once";
         formattedRow.autoPay = Boolean(row.autoPay);
         formattedRow.isPaid = Boolean(row.isPaid);
+        if (row.frequency !== "once" && row.endDate) {
+          formattedRow.endDate = row.endDate;
+        }
         
         // Keep ID if it exists
         if (row.id) {
@@ -296,6 +312,7 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
               <th className="px-4 py-3 w-[150px]">Frequency</th>
               {type === "bills" && (
                 <>
+                  <th className="px-4 py-3 w-[150px]">End Date</th>
                   <th className="px-4 py-3 w-[100px]">Auto Pay</th>
                   <th className="px-4 py-3 w-[100px]">Paid</th>
                 </>
@@ -380,10 +397,12 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                         }
                         onSelect={(date) => {
                           if (date) {
+                            // Ensure we're using the local date without timezone offset
+                            const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
                             if (type === "bills") {
-                              updateCell(index, "dueDate", format(date, "yyyy-MM-dd"));
+                              updateCell(index, "dueDate", localDate.toISOString().split('T')[0]);
                             } else {
-                              updateCell(index, "date", format(date, "yyyy-MM-dd"));
+                              updateCell(index, "date", localDate.toISOString().split('T')[0]);
                             }
                           }
                         }}
@@ -413,6 +432,44 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                     </SelectContent>
                   </Select>
                 </td>
+                
+                {/* End Date (Bills only and when recurring) */}
+                {type === "bills" && row.frequency !== "once" && (
+                  <td className="px-4 py-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {row.endDate ? (
+                            format(new Date(row.endDate), "PPP")
+                          ) : (
+                            <span>No end date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={row.endDate ? new Date(row.endDate) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              // Ensure we're using the local date without timezone offset
+                              const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                              updateCell(index, "endDate", localDate.toISOString().split('T')[0]);
+                            }
+                          }}
+                          disabled={(date) =>
+                            date <= new Date(row.dueDate!) // Can't be before or equal to due date
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </td>
+                )}
                 
                 {/* Auto Pay (Bills only) */}
                 {type === "bills" && (
