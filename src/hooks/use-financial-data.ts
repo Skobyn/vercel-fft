@@ -834,35 +834,28 @@ async function safeAsyncFetch<T>(fetchFn: () => Promise<T>, maxRetries = 1): Pro
   return null;
 }
 
-// Helper hook to fetch all financial data at once
+// Consolidated financial data hook that provides both original format and object format
 export function useFinancialData() {
-  const profile = useFinancialProfile();
-  const incomes = useIncomes();
-  const bills = useBills();
-  const expenses = useExpenses();
-  const budgets = useBudgets();
-  const goals = useGoals();
-  
-  // Use useMemo to memoize the loading state to prevent unnecessary rerenders
-  const loading = useMemo(() => 
-    profile.loading || 
-    incomes.loading || 
-    bills.loading || 
-    expenses.loading || 
-    budgets.loading ||
-    goals.loading,
-  [
-    profile.loading, 
-    incomes.loading, 
-    bills.loading, 
-    expenses.loading, 
-    budgets.loading,
-    goals.loading
-  ]);
-  
+  const profileData = useFinancialProfile();
+  const incomesData = useIncomes();
+  const billsData = useBills();
+  const expensesData = useExpenses();
+  const budgetsData = useBudgets();
+  const goalsData = useGoals();
+
+  // Get loading state by checking if any sub-hook is loading
+  const isLoading = 
+    profileData.loading || 
+    incomesData.loading || 
+    billsData.loading || 
+    expensesData.loading || 
+    budgetsData.loading || 
+    goalsData.loading;
+    
+  // Create refetchAll function for backward compatibility
   const refetchAll = useCallback(() => {
     // Don't refetch if already loading to prevent chain reactions
-    if (loading) {
+    if (isLoading) {
       console.log("Skipping refetchAll because already loading");
       return;
     }
@@ -879,79 +872,129 @@ export function useFinancialData() {
     };
     
     // Execute refetches with a significant delay between each to avoid overloading the system
-    setTimeout(() => safeRefetch('profile', profile.refetch), 0);
-    setTimeout(() => safeRefetch('incomes', incomes.refetch), 500);
-    setTimeout(() => safeRefetch('bills', bills.refetch), 1000);
-    setTimeout(() => safeRefetch('expenses', expenses.refetch), 1500);
-    setTimeout(() => safeRefetch('budgets', budgets.refetch), 2000);
-    setTimeout(() => safeRefetch('goals', goals.refetch), 2500);
-    
+    setTimeout(() => safeRefetch('profile', profileData.refetch), 0);
+    setTimeout(() => safeRefetch('incomes', incomesData.refetch), 500);
+    setTimeout(() => safeRefetch('bills', billsData.refetch), 1000);
+    setTimeout(() => safeRefetch('expenses', expensesData.refetch), 1500);
+    setTimeout(() => safeRefetch('budgets', budgetsData.refetch), 2000);
+    setTimeout(() => safeRefetch('goals', goalsData.refetch), 2500);
   }, [
-    loading,
-    profile.refetch, 
-    incomes.refetch, 
-    bills.refetch, 
-    expenses.refetch, 
-    budgets.refetch, 
-    goals.refetch
+    isLoading,
+    profileData.refetch, 
+    incomesData.refetch, 
+    billsData.refetch, 
+    expensesData.refetch, 
+    budgetsData.refetch, 
+    goalsData.refetch
   ]);
-  
-  // Use useMemo to memoize the return object to prevent unnecessary rerenders
-  return useMemo(() => ({
+
+  // Return a consolidated object with all the data and backward compatibility
+  return {
+    // Original format properties (for backward compatibility)
     profile: {
-      profile: profile.profile || null,
-      loading: profile.loading,
-      error: profile.error,
-      refetch: profile.refetch,
-      updateBalance: profile.updateBalance
+      profile: profileData.profile || null,
+      loading: profileData.loading,
+      error: profileData.error,
+      refetch: profileData.refetch,
+      updateBalance: profileData.updateBalance
     },
     incomes: {
-      incomes: incomes.incomes || [],
-      loading: incomes.loading,
-      error: incomes.error,
-      refetch: incomes.refetch,
-      addIncome: incomes.addIncome,
-      updateIncome: incomes.updateIncome,
-      deleteIncome: incomes.deleteIncome
+      incomes: incomesData.incomes || [],
+      loading: incomesData.loading,
+      error: incomesData.error,
+      refetch: incomesData.refetch,
+      addIncome: incomesData.addIncome,
+      updateIncome: incomesData.updateIncome,
+      deleteIncome: incomesData.deleteIncome
     },
     bills: {
-      bills: bills.bills || [],
-      loading: bills.loading,
-      error: bills.error,
-      refetch: bills.refetch
+      bills: billsData.bills || [],
+      loading: billsData.loading,
+      error: billsData.error,
+      refetch: billsData.refetch
     },
     expenses: {
-      expenses: expenses.expenses || [],
-      loading: expenses.loading,
-      error: expenses.error,
-      refetch: expenses.refetch,
-      addExpense: expenses.addExpense
+      expenses: expensesData.expenses || [],
+      loading: expensesData.loading,
+      error: expensesData.error,
+      refetch: expensesData.refetch,
+      addExpense: expensesData.addExpense
     },
     budgets: {
-      budgets: budgets.budgets || [],
-      loading: budgets.loading,
-      error: budgets.error,
-      refetch: budgets.refetch
+      budgets: budgetsData.budgets || [],
+      loading: budgetsData.loading,
+      error: budgetsData.error,
+      refetch: budgetsData.refetch
     },
     goals: {
-      goals: goals.goals || [],
-      loading: goals.loading,
-      error: goals.error,
-      refetch: goals.refetch
+      goals: goalsData.goals || [],
+      loading: goalsData.loading,
+      error: goalsData.error,
+      refetch: goalsData.refetch
     },
-    loading,
+    loading: isLoading,
     refetchAll,
-    updateFinancialBalance: profile.updateBalance,
-    addIncome: incomes.addIncome,
-    addExpense: expenses.addExpense
-  }), [
-    profile,
-    incomes,
-    bills,
-    expenses,
-    budgets,
-    goals,
-    loading,
-    refetchAll
-  ]);
+    
+    // New format properties (direct access)
+    profileData: profileData.profile,
+    profileUtils: {
+      updateBalance: profileData.updateBalance,
+      refetch: profileData.refetch
+    },
+    incomesData: incomesData.incomes,
+    incomeUtils: {
+      addIncome: incomesData.addIncome,
+      updateIncome: incomesData.updateIncome,
+      deleteIncome: incomesData.deleteIncome,
+      refetch: incomesData.refetch
+    },
+    billsData: billsData.bills,
+    billUtils: {
+      addBill: billsData.addBill,
+      updateBill: billsData.updateBill,
+      deleteBill: billsData.deleteBill,
+      markBillAsPaid: billsData.markBillAsPaid,
+      refetch: billsData.refetch
+    },
+    expensesData: expensesData.expenses,
+    expenseUtils: {
+      addExpense: expensesData.addExpense,
+      updateExpense: expensesData.updateExpense,
+      deleteExpense: expensesData.deleteExpense,
+      refetch: expensesData.refetch
+    },
+    budgetsData: budgetsData.budgets,
+    budgetUtils: {
+      addBudget: budgetsData.addBudget,
+      updateBudget: budgetsData.updateBudget,
+      deleteBudget: budgetsData.deleteBudget,
+      refetch: budgetsData.refetch
+    },
+    goalsData: goalsData.goals,
+    goalUtils: {
+      addGoal: goalsData.addGoal,
+      updateGoal: goalsData.updateGoal,
+      deleteGoal: goalsData.deleteGoal,
+      refetch: goalsData.refetch
+    },
+    
+    // Top-level direct access for convenience
+    updateFinancialBalance: profileData.updateBalance,
+    addIncome: incomesData.addIncome,
+    updateIncome: incomesData.updateIncome,
+    deleteIncome: incomesData.deleteIncome,
+    addBill: billsData.addBill,
+    updateBill: billsData.updateBill,
+    deleteBill: billsData.deleteBill,
+    markBillAsPaid: billsData.markBillAsPaid,
+    addExpense: expensesData.addExpense,
+    updateExpense: expensesData.updateExpense,
+    deleteExpense: expensesData.deleteExpense,
+    addBudget: budgetsData.addBudget,
+    updateBudget: budgetsData.updateBudget, 
+    deleteBudget: budgetsData.deleteBudget,
+    addGoal: goalsData.addGoal,
+    updateGoal: goalsData.updateGoal,
+    deleteGoal: goalsData.deleteGoal
+  };
 } 

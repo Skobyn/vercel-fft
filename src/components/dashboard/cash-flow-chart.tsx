@@ -30,13 +30,26 @@ interface CashFlowChartProps {
 }
 
 export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
-  const { profile, incomes, bills, loading } = useFinancialData();
+  const financialData = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
   const [timeframe, setTimeframe] = useState<string>("90");
   const [error, setError] = useState<string | null>(null);
   const [chartReady, setChartReady] = useState<boolean>(false);
   const [isGeneratingForecast, setIsGeneratingForecast] = useState<boolean>(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use ref to track last successful generation to prevent infinite loops
+  const lastGenerationRef = useRef<{
+    balanceId: string | null;
+    incomesCount: number;
+    billsCount: number;
+    timeframe: string;
+  }>({
+    balanceId: null,
+    incomesCount: 0,
+    billsCount: 0,
+    timeframe: "90"
+  });
   
   // Reset chart state when component unmounts
   useEffect(() => {
@@ -56,14 +69,33 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     }
     
     // Don't do anything if still loading
-    if (loading) {
+    if (financialData.loading) {
       setChartReady(false);
       return;
     }
     
     // Guard clause to prevent unnecessary processing
-    if (!profile?.profile) {
+    if (!financialData.profileData) {
       setError("Financial profile data not available");
+      setChartReady(true);
+      return;
+    }
+    
+    // Get current state for reference
+    const currentBalance = financialData.profileData?.currentBalance || 0;
+    const incomesArray = financialData.incomesData || [];
+    const billsArray = financialData.billsData || [];
+    const balanceId = `${currentBalance}-${financialData.profileData?.lastUpdated || ''}`;
+    
+    // Check if we need to regenerate the forecast
+    const shouldRegenerateForcecast = 
+      lastGenerationRef.current.balanceId !== balanceId ||
+      lastGenerationRef.current.incomesCount !== incomesArray.length ||
+      lastGenerationRef.current.billsCount !== billsArray.length ||
+      lastGenerationRef.current.timeframe !== timeframe;
+    
+    // Skip generation if data is the same as before
+    if (!shouldRegenerateForcecast && forecastData.length > 0) {
       setChartReady(true);
       return;
     }
@@ -76,14 +108,8 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
       try {
         const days = parseInt(timeframe);
         
-        // Ensure we have all required data before generating forecast
-        const currentBalance = profile?.profile?.currentBalance || 0;
-        
-        // Prepare arrays, ensuring they are valid
-        const incomeArray = Array.isArray(incomes) ? incomes : [];
-        const billsArray = Array.isArray(bills) ? bills : [];
-        
-        console.log(`Generating forecast with ${incomeArray.length} incomes and ${billsArray.length} bills`);
+        // Log what we're working with
+        console.log(`Generating forecast with ${incomesArray.length} incomes and ${billsArray.length} bills`);
         
         // Double-check for valid data before generating forecast
         if (typeof currentBalance !== 'number' || isNaN(currentBalance)) {
@@ -93,7 +119,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         // Call the forecast generation utility
         const forecast = generateCashFlowForecast(
           currentBalance,
-          incomeArray,
+          incomesArray,
           billsArray,
           [], // No balance adjustments for now
           days
@@ -103,6 +129,14 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         if (!Array.isArray(forecast) || forecast.length === 0) {
           throw new Error("Generated forecast is empty or invalid");
         }
+        
+        // Update the last generation reference
+        lastGenerationRef.current = {
+          balanceId,
+          incomesCount: incomesArray.length,
+          billsCount: billsArray.length,
+          timeframe
+        };
         
         // Set the forecast data in state
         setForecastData(forecast);
@@ -114,11 +148,11 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         setForecastData([{
           itemId: 'initial-balance',
           date: new Date().toISOString(),
-          amount: profile.profile?.currentBalance ?? 0,
+          amount: financialData.profileData?.currentBalance ?? 0,
           category: 'balance',
           name: 'Current Balance',
           type: 'balance',
-          runningBalance: profile.profile?.currentBalance ?? 0
+          runningBalance: financialData.profileData?.currentBalance ?? 0
         }]);
       } finally {
         setIsGeneratingForecast(false);
@@ -126,7 +160,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         timeoutRef.current = null;
       }
     }, 50); // Small delay to allow rendering
-  }, [profile, incomes, bills, loading, timeframe]);
+  }, [financialData, timeframe]);
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value);
@@ -134,7 +168,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   };
 
   // Show loading state if data is still loading
-  if (loading || isGeneratingForecast || !chartReady) {
+  if (financialData.loading || isGeneratingForecast || !chartReady) {
     return (
       <Card className="col-span-2 h-[400px]">
         <CardHeader>
@@ -145,7 +179,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
           <div className="text-center">
             <LoadingSpinner size="lg" />
             <p className="mt-4 text-muted-foreground">
-              {loading ? "Loading your financial data..." : "Generating your cash flow forecast..."}
+              {financialData.loading ? "Loading your financial data..." : "Generating your cash flow forecast..."}
             </p>
           </div>
         </CardContent>
@@ -154,7 +188,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   }
 
   // Show error state if there's an error
-  if (error || !profile?.profile) {
+  if (error || !financialData.profileData) {
     return (
       <Card className="col-span-2 h-[400px]">
         <CardHeader>
@@ -182,7 +216,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   }
 
   // Safe access to data
-  const startingBalance = profile.profile.currentBalance || 0;
+  const startingBalance = financialData.profileData.currentBalance || 0;
   const endBalance = forecastData.length > 0 
     ? (forecastData[forecastData.length - 1].runningBalance || startingBalance) 
     : startingBalance;

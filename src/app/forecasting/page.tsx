@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -68,7 +68,7 @@ type MandatoryExpense = {
 };
 
 type OptionalExpense = {
-  id: number;
+  id: string;
   name: string;
   amount: number;
   category: string;
@@ -87,8 +87,8 @@ type MonthlyForecast = {
 
 export default function ForecastingPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
-  const { profile, incomes, bills, loading: dataLoading } = useFinancialData();
+  const { user, loading: authLoading } = useAuth();
+  const financialData = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
 
   const [forecastPeriod, setForecastPeriod] = useState<string>("3m");
@@ -96,8 +96,21 @@ export default function ForecastingPage() {
   const [openAddIncomeDialog, setOpenAddIncomeDialog] = useState(false);
   const [openAddExpenseDialog, setOpenAddExpenseDialog] = useState(false);
   
+  // Use ref to track last successful generation to prevent infinite loops
+  const lastGenerationRef = useRef<{
+    balanceId: string | null;
+    incomesCount: number;
+    billsCount: number;
+    forecastPeriod: string;
+  }>({
+    balanceId: null,
+    incomesCount: 0,
+    billsCount: 0,
+    forecastPeriod: "3m"
+  });
+  
   // Placeholder for optional expenses - in the future, this would come from the database
-  const optionalExpenses = [
+  const optionalExpenses: OptionalExpense[] = [
     {
       id: '1',
       name: 'Entertainment',
@@ -117,14 +130,33 @@ export default function ForecastingPage() {
   ];
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push("/auth/signin");
     }
-  }, [loading, user, router]);
+  }, [authLoading, user, router]);
 
-  // Generate forecast data when dependencies change
+  // Generate forecast data when dependencies change, with safeguards
   useEffect(() => {
-    if (loading || dataLoading || !profile?.profile) return;
+    // Don't do anything if still loading
+    if (authLoading || financialData.loading || !financialData.profileData) return;
+
+    // Get current state for reference
+    const currentBalance = financialData.profileData?.currentBalance || 0;
+    const incomesArray = financialData.incomesData || [];
+    const billsArray = financialData.billsData || [];
+    const balanceId = `${currentBalance}-${financialData.profileData?.lastUpdated || ''}`;
+    
+    // Check if we need to regenerate the forecast
+    const shouldRegenerateForcecast = 
+      lastGenerationRef.current.balanceId !== balanceId ||
+      lastGenerationRef.current.incomesCount !== incomesArray.length ||
+      lastGenerationRef.current.billsCount !== billsArray.length ||
+      lastGenerationRef.current.forecastPeriod !== forecastPeriod;
+    
+    // Skip generation if data is the same as before
+    if (!shouldRegenerateForcecast && forecastData.length > 0) {
+      return;
+    }
 
     try {
       const days = forecastPeriod === "1m" ? 30 : 
@@ -133,32 +165,40 @@ export default function ForecastingPage() {
       
       // Generate forecast data using the utility function
       const forecast = generateCashFlowForecast(
-        profile.profile.currentBalance,
-        incomes.incomes || [],
-        bills.bills || [],
+        currentBalance,
+        incomesArray,
+        billsArray,
         [], // No balance adjustments for this view
         days
       );
+      
+      // Update the last generation reference
+      lastGenerationRef.current = {
+        balanceId,
+        incomesCount: incomesArray.length,
+        billsCount: billsArray.length,
+        forecastPeriod
+      };
       
       setForecastData(forecast);
     } catch (error) {
       console.error("Error generating forecast:", error);
       // Create minimal forecast with current balance as fallback
-      if (profile?.profile) {
+      if (financialData.profileData) {
         setForecastData([{
           itemId: 'initial-balance',
           date: new Date().toISOString(),
-          amount: profile.profile.currentBalance || 0,
+          amount: financialData.profileData.currentBalance || 0,
           category: 'balance',
           name: 'Current Balance',
           type: 'balance',
-          runningBalance: profile.profile.currentBalance || 0
+          runningBalance: financialData.profileData.currentBalance || 0
         }]);
       }
     }
-  }, [forecastPeriod, profile, incomes, bills, loading, dataLoading]);
+  }, [forecastPeriod, financialData, authLoading, forecastData.length]);
 
-  if (loading || dataLoading) {
+  if (authLoading || financialData.loading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -181,12 +221,12 @@ export default function ForecastingPage() {
       return {
         projectedIncome: "0.00",
         projectedExpenses: "0.00",
-        endingBalance: profile?.profile?.currentBalance?.toFixed(2) || "0.00"
+        endingBalance: financialData.profileData?.currentBalance?.toFixed(2) || "0.00"
       };
     }
 
     // Get starting balance (current balance)
-    const startingBalance = profile?.profile?.currentBalance || 0;
+    const startingBalance = financialData.profileData?.currentBalance || 0;
     
     // Calculate projected income (sum of all positive amounts)
     const projectedIncome = forecastData
@@ -288,7 +328,7 @@ export default function ForecastingPage() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(profile?.profile?.currentBalance || 0)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(financialData.profileData?.currentBalance || 0)}</div>
               <p className="text-xs text-muted-foreground">As of today</p>
             </CardContent>
           </Card>
@@ -482,7 +522,7 @@ export default function ForecastingPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {incomes.incomes.map((income) => (
+                  {financialData.incomesData.map((income) => (
                     <div key={income.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -592,7 +632,7 @@ export default function ForecastingPage() {
                       </div>
 
                       <div className="max-h-80 overflow-y-auto space-y-4">
-                        {bills.bills.map((expense) => (
+                        {financialData.billsData.map((expense) => (
                           <div key={expense.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
