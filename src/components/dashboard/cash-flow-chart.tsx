@@ -29,10 +29,10 @@ interface CashFlowChartProps {
   days?: number;
 }
 
-export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
+export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
   const financialData = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
-  const [timeframe, setTimeframe] = useState<string>("90");
+  const [timeframe, setTimeframe] = useState<string>("14");
   const [error, setError] = useState<string | null>(null);
   const [chartReady, setChartReady] = useState<boolean>(false);
   const [isGeneratingForecast, setIsGeneratingForecast] = useState<boolean>(false);
@@ -48,7 +48,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     balanceId: null,
     incomesCount: 0,
     billsCount: 0,
-    timeframe: "90"
+    timeframe: "14"
   });
   
   // Reset chart state when component unmounts
@@ -256,10 +256,10 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
               <SelectValue placeholder="Timeframe" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="14">14 Days</SelectItem>
               <SelectItem value="30">30 Days</SelectItem>
               <SelectItem value="60">60 Days</SelectItem>
               <SelectItem value="90">90 Days</SelectItem>
-              <SelectItem value="180">6 Months</SelectItem>
             </SelectContent>
           </Select>
         </div>

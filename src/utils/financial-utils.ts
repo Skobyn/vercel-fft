@@ -178,13 +178,16 @@ export function generateCashFlowForecast(
       }
     };
     
-    // Process incomes with proper recurring handling
+    // For very short forecast periods (≤ 14 days), use a simpler approach to prevent memory issues
+    const isShortForecast = normalizedDays <= 14;
+    
+    // Process incomes with proper recurring handling based on forecast length
     safelyAddItems(validIncomes, (income) => {
       // Only process valid income items
       if (!income.id || !income.date || isNaN(income.amount)) return null;
       
-      // For recurring items, generate all occurrences for the forecast period
-      if (income.isRecurring && income.frequency) {
+      // For recurring items in short forecasts, only generate if they occur in the period
+      if (income.isRecurring && income.frequency && !isShortForecast) {
         return generateOccurrences(
           {
             ...income,
@@ -195,22 +198,49 @@ export function generateCashFlowForecast(
           'date',
           normalizedDays
         );
+      } else if (income.isRecurring && income.frequency && isShortForecast) {
+        // For short forecasts, only include if the next occurrence is within the forecast period
+        const nextDate = new Date(calculateNextOccurrence(income.date, income.frequency));
+        const forecastEndDate = new Date();
+        forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
+        
+        if (nextDate <= forecastEndDate) {
+          return {
+            itemId: income.id,
+            date: nextDate.toISOString(),
+            amount: income.amount,
+            category: income.category || 'Income',
+            name: income.name || 'Income',
+            type: 'income',
+            runningBalance: 0, // Will be calculated later
+            description: `${income.name} (${income.category}) - Next occurrence`
+          };
+        }
+        return null;
       }
       
-      // For non-recurring items, just add the single occurrence
-      return {
-        itemId: income.id,
-        date: income.date,
-        amount: income.amount,
-        category: income.category || 'Income',
-        name: income.name || 'Income',
-        type: 'income',
-        runningBalance: 0, // Will be calculated later
-        description: `${income.name} (${income.category})`
-      };
+      // For non-recurring items, just add the single occurrence if within forecast period
+      const itemDate = new Date(income.date);
+      const currentDate = new Date();
+      const forecastEndDate = new Date();
+      forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
+      
+      if (itemDate >= currentDate && itemDate <= forecastEndDate) {
+        return {
+          itemId: income.id,
+          date: income.date,
+          amount: income.amount,
+          category: income.category || 'Income',
+          name: income.name || 'Income',
+          type: 'income',
+          runningBalance: 0, // Will be calculated later
+          description: `${income.name} (${income.category})`
+        };
+      }
+      return null;
     }, 'income');
     
-    // Process bills with proper recurring handling
+    // Process bills with proper recurring handling based on forecast length
     safelyAddItems(validBills, (bill) => {
       // Skip paid bills
       if (bill.isPaid) return null;
@@ -218,8 +248,8 @@ export function generateCashFlowForecast(
       // Only process valid bill items
       if (!bill.id || !bill.dueDate || isNaN(bill.amount)) return null;
       
-      // For recurring bills, generate all occurrences for the forecast period
-      if (bill.isRecurring && bill.frequency) {
+      // For recurring bills in short forecasts, only generate if they occur in the period
+      if (bill.isRecurring && bill.frequency && !isShortForecast) {
         return generateOccurrences(
           {
             ...bill,
@@ -235,38 +265,72 @@ export function generateCashFlowForecast(
           type: 'bill',
           description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
         }));
+      } else if (bill.isRecurring && bill.frequency && isShortForecast) {
+        // For short forecasts, only include if the next occurrence is within the forecast period
+        const nextDate = new Date(calculateNextOccurrence(bill.dueDate, bill.frequency));
+        const forecastEndDate = new Date();
+        forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
+        
+        if (nextDate <= forecastEndDate) {
+          return {
+            itemId: bill.id,
+            date: nextDate.toISOString(),
+            amount: -Math.abs(bill.amount),
+            category: bill.category || 'Expense',
+            name: bill.name || 'Bill',
+            type: 'bill',
+            runningBalance: 0, // Will be calculated later
+            description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
+          };
+        }
+        return null;
       }
       
-      // For non-recurring bills, just add the single occurrence
-      return {
-        itemId: bill.id,
-        date: bill.dueDate,
-        amount: -Math.abs(bill.amount), // Ensure bills are negative
-        category: bill.category || 'Expense',
-        name: bill.name || 'Bill',
-        type: 'bill',
-        runningBalance: 0, // Will be calculated later
-        description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
-      };
+      // For non-recurring bills, just add the single occurrence if within forecast period
+      const dueDate = new Date(bill.dueDate);
+      const currentDate = new Date();
+      const forecastEndDate = new Date();
+      forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
+      
+      if (dueDate >= currentDate && dueDate <= forecastEndDate) {
+        return {
+          itemId: bill.id,
+          date: bill.dueDate,
+          amount: -Math.abs(bill.amount), // Ensure bills are negative
+          category: bill.category || 'Expense',
+          name: bill.name || 'Bill',
+          type: 'bill',
+          runningBalance: 0, // Will be calculated later
+          description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
+        };
+      }
+      return null;
     }, 'bill');
 
-    // Process expenses with proper recurring handling
+    // Process expenses with date filtering
     safelyAddItems(validExpenses, (expense) => {
       // Only process valid expense items
       if (!expense.id || !expense.date || isNaN(expense.amount)) return null;
       
-      // Expenses don't have recurring properties in our data model
-      // Just add the single occurrence
-      return {
-        itemId: expense.id,
-        date: expense.date,
-        amount: -Math.abs(expense.amount), // Ensure expenses are negative
-        category: expense.category || 'Expense',
-        name: expense.name || 'Expense',
-        type: 'expense',
-        runningBalance: 0, // Will be calculated later
-        description: `${expense.name} (${expense.category})${expense.isPlanned ? ' - Planned' : ' - Unplanned'}`
-      };
+      // Only include expenses if they are within the forecast period
+      const expenseDate = new Date(expense.date);
+      const currentDate = new Date();
+      const forecastEndDate = new Date();
+      forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
+      
+      if (expenseDate >= currentDate && expenseDate <= forecastEndDate) {
+        return {
+          itemId: expense.id,
+          date: expense.date,
+          amount: -Math.abs(expense.amount), // Ensure expenses are negative
+          category: expense.category || 'Expense',
+          name: expense.name || 'Expense',
+          type: 'expense',
+          runningBalance: 0, // Will be calculated later
+          description: `${expense.name} (${expense.category})${expense.isPlanned ? ' - Planned' : ' - Unplanned'}`
+        };
+      }
+      return null;
     }, 'expense');
     
     // Process balance adjustments
