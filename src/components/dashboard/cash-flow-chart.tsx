@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { CalendarIcon, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarIcon, TrendingDown, TrendingUp, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +23,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFinancialData } from "@/hooks/use-financial-data";
 import { ForecastItem, BalanceAdjustment } from "@/types/financial";
 import { generateCashFlowForecast, formatCurrency, formatDate } from "@/utils/financial-utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface CashFlowChartProps {
   days?: number;
@@ -32,111 +33,188 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   const { profile, incomes, bills, loading } = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
   const [timeframe, setTimeframe] = useState<string>("90");
+  const [error, setError] = useState<string | null>(null);
+  const [chartReady, setChartReady] = useState<boolean>(false);
+  const [isGeneratingForecast, setIsGeneratingForecast] = useState<boolean>(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Reset chart state when component unmounts
   useEffect(() => {
-    // Guard clause to prevent unnecessary processing
-    if (!profile?.profile || loading) return;
-
-    try {
-      console.log("Generating cash flow forecast with:", {
-        balance: profile.profile.currentBalance,
-        incomes: (incomes?.incomes || []).length,
-        bills: (bills?.bills || []).length,
-        timeframe
-      });
-      
-      const forecast = generateCashFlowForecast(
-        profile.profile.currentBalance,
-        incomes?.incomes || [],
-        bills?.bills || [],
-        [], // No balance adjustments yet
-        parseInt(timeframe)
-      );
-      
-      // Only update state if forecast is valid to prevent unnecessary renders
-      if (Array.isArray(forecast) && forecast.length > 0) {
-        setForecastData(forecast);
-      } else {
-        console.log("Generated empty forecast, not updating state");
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-    } catch (error) {
-      console.error("Error generating cash flow forecast:", error);
-      // Don't update state on error to prevent rendering issues
+    };
+  }, []);
+  
+  // Effect for generating forecast with safeguards
+  useEffect(() => {
+    // Clear previous timeout if it exists
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
+    
+    // Don't do anything if still loading
+    if (loading) {
+      setChartReady(false);
+      return;
+    }
+    
+    // Guard clause to prevent unnecessary processing
+    if (!profile?.profile) {
+      setError("Financial profile data not available");
+      setChartReady(true);
+      return;
+    }
+    
+    // Set state to indicate forecast generation is in progress
+    setIsGeneratingForecast(true);
+    setError(null);
+    
+    // Use timeout to avoid blocking the main thread for too long
+    timeoutRef.current = setTimeout(() => {
+      try {
+        console.log("Generating cash flow forecast with:", {
+          balance: profile.profile.currentBalance,
+          incomes: (incomes?.incomes || []).length,
+          bills: (bills?.bills || []).length,
+          timeframe
+        });
+        
+        const balance = profile.profile.currentBalance;
+        const incomeData = incomes?.incomes || [];
+        const billData = bills?.bills || [];
+        const daysValue = parseInt(timeframe);
+        
+        // Additional guard clauses
+        if (isNaN(balance)) {
+          throw new Error("Invalid balance value");
+        }
+        
+        if (!Array.isArray(incomeData) || !Array.isArray(billData)) {
+          throw new Error("Income or bill data is not an array");
+        }
+        
+        // Generate forecast
+        const forecast = generateCashFlowForecast(
+          balance,
+          incomeData,
+          billData,
+          [], // No balance adjustments yet
+          daysValue
+        );
+        
+        // Only update state if forecast is valid
+        if (Array.isArray(forecast) && forecast.length > 0) {
+          setForecastData(forecast);
+          setError(null);
+        } else {
+          setError("Unable to generate forecast data");
+        }
+      } catch (error) {
+        console.error("Error generating cash flow forecast:", error);
+        setError(error instanceof Error ? error.message : "Unable to generate forecast");
+        // Provide default data to prevent rendering issues
+        setForecastData([{
+          itemId: 'initial-balance',
+          date: new Date().toISOString(),
+          amount: profile.profile?.currentBalance || 0,
+          category: 'balance',
+          name: 'Current Balance',
+          type: 'balance',
+          runningBalance: profile.profile?.currentBalance || 0
+        }]);
+      } finally {
+        setIsGeneratingForecast(false);
+        setChartReady(true);
+        timeoutRef.current = null;
+      }
+    }, 50); // Small delay to allow rendering
   }, [profile, incomes, bills, loading, timeframe]);
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value);
+    setChartReady(false);  // Reset chart ready state
   };
 
-  if (loading) {
+  // Show loading state if data is still loading
+  if (loading || isGeneratingForecast || !chartReady) {
     return (
-      <Card className="h-[400px] flex items-center justify-center">
-        <LoadingSpinner size="lg" />
+      <Card className="col-span-2 h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-muted-foreground">
+            {loading ? "Loading financial data..." : "Generating forecast..."}
+          </p>
+        </div>
       </Card>
     );
   }
 
-  if (!profile.profile) {
+  // Show error state if there's an error
+  if (error || !profile?.profile) {
     return (
-      <Card className="h-[400px]">
+      <Card className="col-span-2 h-[400px]">
         <CardHeader>
           <CardTitle>Cash Flow Forecast</CardTitle>
-          <CardDescription>Error loading forecast</CardDescription>
+          <CardDescription>Unable to generate forecast</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px] flex items-center justify-center">
-          <p className="text-muted-foreground">Unable to generate forecast</p>
+        <CardContent className="h-[300px] flex flex-col items-center justify-center">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error || "Financial profile not available. Please refresh the page."}
+            </AlertDescription>
+          </Alert>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  const startingBalance = profile.profile.currentBalance;
+  // Safe access to data
+  const startingBalance = profile.profile.currentBalance || 0;
   const endBalance = forecastData.length > 0 
-    ? forecastData[forecastData.length - 1].runningBalance || startingBalance 
+    ? (forecastData[forecastData.length - 1].runningBalance || startingBalance) 
     : startingBalance;
   
   const isPositive = endBalance >= startingBalance;
-  const percentChange = startingBalance ? ((endBalance - startingBalance) / Math.abs(startingBalance)) * 100 : 0;
+  const percentChange = startingBalance 
+    ? ((endBalance - startingBalance) / Math.abs(startingBalance || 1)) * 100 
+    : 0;
 
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 border rounded-md shadow-sm">
-          <p className="font-medium">{formatDate(data.date, "long")}</p>
-          <p className="text-sm text-gray-500">{data.name}</p>
-          <p className="text-sm font-medium mt-1">
-            {data.type === 'balance' 
-              ? 'Balance: ' 
-              : data.type === 'income' 
-                ? 'Income: ' 
-                : data.type === 'expense' 
-                  ? 'Bill: ' 
-                  : 'Adjustment: '}
-            <span className={data.amount >= 0 ? "text-green-600" : "text-red-600"}>
-              {formatCurrency(data.amount)}
-            </span>
-          </p>
-          <p className="text-sm font-medium">
-            Running Balance: {formatCurrency(data.runningBalance || 0)}
-          </p>
-        </div>
-      );
+  // Simple tooltip component to avoid complex calculations
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length > 0) {
+      try {
+        const data = payload[0].payload;
+        return (
+          <div className="bg-white p-3 border rounded-md shadow-sm">
+            <p className="font-medium">{formatDate(data.date, "long")}</p>
+            <p className="text-sm font-medium">
+              Balance: {formatCurrency(data.balance || 0)}
+            </p>
+          </div>
+        );
+      } catch (err) {
+        return <div className="bg-white p-3 border rounded-md shadow-sm">Error displaying data</div>;
+      }
     }
     return null;
   };
 
-  // Create data for chart
+  // Create simple data for chart
   const chartData = forecastData.map((item) => ({
     date: new Date(item.date).toLocaleDateString(),
     balance: item.runningBalance || 0,
-    type: item.type,
-    amount: item.amount,
-    name: item.name,
-    fullDate: item.date,
-    runningBalance: item.runningBalance || 0
   }));
 
   return (
@@ -179,7 +257,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         </div>
         
         <div className="h-[300px]">
-          {chartData.length > 0 ? (
+          {chartData.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={chartData}
@@ -194,11 +272,23 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
                 <XAxis 
                   dataKey="date" 
                   tick={{ fontSize: 12 }} 
-                  tickFormatter={(value) => value.split('/').slice(0, 2).join('/')}
+                  tickFormatter={(value) => {
+                    try {
+                      return value.split('/').slice(0, 2).join('/');
+                    } catch (e) {
+                      return '';
+                    }
+                  }}
                 />
                 <YAxis 
                   tick={{ fontSize: 12 }} 
-                  tickFormatter={(value) => formatCurrency(value).split('.')[0]}
+                  tickFormatter={(value) => {
+                    try {
+                      return formatCurrency(value).split('.')[0];
+                    } catch (e) {
+                      return '';
+                    }
+                  }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine 

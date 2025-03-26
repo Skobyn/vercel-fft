@@ -144,16 +144,31 @@ export default function DashboardPage() {
     // Set transitioning to prevent component thrashing
     setIsTransitioning(true);
     
-    // Add small delay before changing state to avoid synchronous re-renders
+    // Close the setup guide immediately
+    setShowSetupGuide(false);
+    
+    // Add a delayed state reset to ensure components have time to unmount properly
     setTimeout(() => {
-      setShowSetupGuide(false);
-      
-      // Add small delay before removing transition state
-      setTimeout(() => {
+      // Clear any loading states
+      const clearLoadingState = () => {
         setIsTransitioning(false);
-      }, 500); // Adjust time as needed
-    }, 100);
+      };
+      
+      // Put this on a timer to prevent immediate execution
+      setTimeout(clearLoadingState, 1000);
+    }, 500);
   };
+
+  // If the component is transitioning, show a loading state
+  if (isTransitioning) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <LoadingSpinner size="lg" message="Preparing dashboard..." />
+        </div>
+      </MainLayout>
+    );
+  }
 
   // Show loading state while checking authentication or loading profile
   if (loading || (!authChecked && !user)) {
@@ -167,7 +182,7 @@ export default function DashboardPage() {
   }
 
   // Show loading state while loading financial data
-  if (profileLoading || incomesLoading || isTransitioning) {
+  if (profileLoading || incomesLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[80vh]">

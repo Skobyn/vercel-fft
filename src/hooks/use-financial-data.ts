@@ -783,6 +783,42 @@ export function useGoals() {
   };
 }
 
+// Helper function to safely wrap an async fetch with timeout and error handling
+async function safeAsyncFetch<T>(fetchFn: () => Promise<T>, maxRetries = 1): Promise<T | null> {
+  let retries = 0;
+  
+  // Create a fetch function with timeout
+  const fetchWithTimeout = async (timeout: number) => {
+    return Promise.race([
+      fetchFn(),
+      new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error(`Fetch operation timed out after ${timeout}ms`)), timeout)
+      )
+    ]);
+  };
+
+  while (retries <= maxRetries) {
+    try {
+      // Increase timeout on retries
+      const timeout = 8000 + (retries * 2000);
+      return await fetchWithTimeout(timeout) as T;
+    } catch (err) {
+      console.error(`Fetch error (attempt ${retries + 1}/${maxRetries + 1}):`, err);
+      retries++;
+      
+      if (retries > maxRetries) {
+        console.error('Max retries exceeded');
+        return null;
+      }
+      
+      // Wait before retrying - exponential backoff
+      await new Promise(r => setTimeout(r, retries * 1000));
+    }
+  }
+  
+  return null;
+}
+
 // Helper hook to fetch all financial data at once
 export function useFinancialData() {
   const profile = useFinancialProfile();
@@ -827,13 +863,13 @@ export function useFinancialData() {
       }
     };
     
-    // Execute refetches with a slight delay between each
+    // Execute refetches with a significant delay between each to avoid overloading the system
     setTimeout(() => safeRefetch('profile', profile.refetch), 0);
-    setTimeout(() => safeRefetch('incomes', incomes.refetch), 100);
-    setTimeout(() => safeRefetch('bills', bills.refetch), 200);
-    setTimeout(() => safeRefetch('expenses', expenses.refetch), 300);
-    setTimeout(() => safeRefetch('budgets', budgets.refetch), 400);
-    setTimeout(() => safeRefetch('goals', goals.refetch), 500);
+    setTimeout(() => safeRefetch('incomes', incomes.refetch), 500);
+    setTimeout(() => safeRefetch('bills', bills.refetch), 1000);
+    setTimeout(() => safeRefetch('expenses', expenses.refetch), 1500);
+    setTimeout(() => safeRefetch('budgets', budgets.refetch), 2000);
+    setTimeout(() => safeRefetch('goals', goals.refetch), 2500);
     
   }, [
     loading,

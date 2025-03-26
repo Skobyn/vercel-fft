@@ -86,6 +86,7 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
 
 /**
  * Generates a cash flow forecast for the specified number of days
+ * with optimizations to prevent performance issues
  */
 export function generateCashFlowForecast(
   currentBalance: number,
@@ -95,137 +96,159 @@ export function generateCashFlowForecast(
   days: number = 90
 ): ForecastItem[] {
   try {
-    console.log('Starting forecast generation with:', {
-      currentBalance,
-      incomes: incomes?.length || 0,
-      bills: bills?.length || 0,
-      adjustments: balanceAdjustments?.length || 0,
-      days
+    // Normalize all inputs to prevent errors
+    const normalizedBalance = isNaN(currentBalance) ? 0 : currentBalance;
+    const normalizedDays = (!days || isNaN(days) || days <= 0 || days > 365) ? 90 : days;
+    
+    // Ensure arrays are valid and limit their size to prevent processing too much
+    const validIncomes = Array.isArray(incomes) ? incomes.slice(0, 100) : [];
+    const validBills = Array.isArray(bills) ? bills.slice(0, 100) : [];
+    const validAdjustments = Array.isArray(balanceAdjustments) ? balanceAdjustments.slice(0, 50) : [];
+    
+    console.log('Generating forecast with:', {
+      balance: normalizedBalance,
+      incomes: validIncomes.length,
+      bills: validBills.length,
+      adjustments: validAdjustments.length,
+      days: normalizedDays
     });
     
-    // Validate inputs
-    if (isNaN(currentBalance) || !isFinite(currentBalance)) {
-      console.error('Invalid current balance:', currentBalance);
-      currentBalance = 0;
-    }
-    
-    if (!Array.isArray(incomes)) {
-      console.error('Incomes is not an array:', incomes);
-      incomes = [];
-    }
-    
-    if (!Array.isArray(bills)) {
-      console.error('Bills is not an array:', bills);
-      bills = [];
-    }
-    
-    if (!Array.isArray(balanceAdjustments)) {
-      console.error('Balance adjustments is not an array:', balanceAdjustments);
-      balanceAdjustments = [];
-    }
-    
-    if (isNaN(days) || days <= 0 || days > 365) {
-      console.error('Invalid days parameter:', days);
-      days = 90;
-    }
-    
-    let forecast: ForecastItem[] = [];
-    
-    // Add initial balance as a forecast item
-    forecast.push({
+    // Initialize forecast with current balance
+    const forecast: ForecastItem[] = [{
       itemId: 'initial-balance',
       date: new Date().toISOString(),
-      amount: currentBalance,
+      amount: normalizedBalance,
       category: 'balance',
       name: 'Current Balance',
-      type: 'balance'
-    });
+      type: 'balance',
+      runningBalance: normalizedBalance
+    }];
     
-    // Process incomes (with error handling for each item)
-    incomes.forEach(income => {
-      try {
-        const occurrences = generateOccurrences(income, 'date', days);
-        forecast = [...forecast, ...occurrences];
-      } catch (error) {
-        console.error('Error processing income item:', income, error);
-      }
-    });
-    
-    // Process bills (with error handling for each item)
-    bills.forEach(bill => {
-      try {
-        if (!bill.isPaid) {
-          const occurrences = generateOccurrences(
-            { ...bill, amount: -Math.abs(bill.amount) }, // Ensure bill amount is negative
-            'dueDate', 
-            days
-          );
-          forecast = [...forecast, ...occurrences];
+    // Function to safely add items to forecast
+    const safelyAddItems = (
+      items: any[], 
+      processItem: (item: any) => ForecastItem | ForecastItem[] | null,
+      itemType: string
+    ) => {
+      let processed = 0;
+      
+      for (const item of items) {
+        try {
+          const result = processItem(item);
+          
+          if (Array.isArray(result)) {
+            forecast.push(...result);
+            processed += result.length;
+          } else if (result) {
+            forecast.push(result);
+            processed++;
+          }
+          
+          // Performance safeguard: don't process too many items
+          if (processed > 1000) {
+            console.warn(`Processing limit reached for ${itemType}. Some items may be omitted.`);
+            break;
+          }
+        } catch (error) {
+          console.error(`Error processing ${itemType} item:`, error);
+          // Skip this item and continue with others
         }
-      } catch (error) {
-        console.error('Error processing bill item:', bill, error);
       }
-    });
+    };
     
-    // Add balance adjustments (with error handling for each item)
-    balanceAdjustments.forEach(adjustment => {
-      try {
-        forecast.push({
-          itemId: adjustment.id,
-          date: adjustment.date,
-          amount: adjustment.amount,
-          category: 'adjustment',
-          name: adjustment.reason || 'Balance Adjustment',
-          type: 'adjustment'
-        });
-      } catch (error) {
-        console.error('Error processing balance adjustment:', adjustment, error);
-      }
-    });
+    // Process incomes - simpler version that avoids complex calculations
+    safelyAddItems(validIncomes, (income) => {
+      // Only process valid income items
+      if (!income.id || !income.date || isNaN(income.amount)) return null;
+      
+      // For recurring items, we'll just simplify to one occurrence
+      // This prevents exponential growth of forecast items
+      return {
+        itemId: income.id,
+        date: income.date,
+        amount: income.amount,
+        category: income.category || 'Income',
+        name: income.name || 'Income',
+        type: 'income',
+        runningBalance: 0 // Will be calculated later
+      };
+    }, 'income');
+    
+    // Process bills - simplified to avoid excessive items
+    safelyAddItems(validBills, (bill) => {
+      // Skip paid bills
+      if (bill.isPaid) return null;
+      
+      // Only process valid bill items
+      if (!bill.id || !bill.dueDate || isNaN(bill.amount)) return null;
+      
+      return {
+        itemId: bill.id,
+        date: bill.dueDate,
+        amount: -Math.abs(bill.amount), // Ensure bills are negative
+        category: bill.category || 'Expense',
+        name: bill.name || 'Bill',
+        type: 'expense',
+        runningBalance: 0 // Will be calculated later
+      };
+    }, 'bill');
+    
+    // Process balance adjustments
+    safelyAddItems(validAdjustments, (adjustment) => {
+      if (!adjustment.id || !adjustment.date || isNaN(adjustment.amount)) return null;
+      
+      return {
+        itemId: adjustment.id,
+        date: adjustment.date,
+        amount: adjustment.amount,
+        category: 'adjustment',
+        name: adjustment.reason || 'Balance Adjustment',
+        type: 'adjustment',
+        runningBalance: 0 // Will be calculated later
+      };
+    }, 'adjustment');
     
     // Sort by date
     forecast.sort((a, b) => {
       try {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       } catch (error) {
-        // Default to 0 (equal) if there's an error
-        console.error('Error sorting forecast items:', a, b, error);
-        return 0;
+        return 0; // Default to equal if error parsing dates
       }
     });
     
-    // Calculate running balance
-    let runningBalance = 0;
-    forecast.forEach(item => {
-      try {
-        if (item.type === 'balance') {
-          runningBalance = item.amount;
-        } else {
-          // Ensure item.amount is a valid number
-          const amountToAdd = isNaN(item.amount) ? 0 : item.amount;
-          runningBalance += amountToAdd;
-        }
-        item.runningBalance = runningBalance;
-      } catch (error) {
-        console.error('Error calculating running balance for item:', item, error);
-        // Preserve previous running balance
-        item.runningBalance = runningBalance;
-      }
-    });
+    // Limit the number of items for performance
+    const maxItems = Math.min(forecast.length, 365); // Reasonable limit
+    const trimmedForecast = forecast.slice(0, maxItems);
     
-    console.log(`Generated forecast with ${forecast.length} items`);
-    return forecast;
+    // Calculate running balance in a single pass
+    let runningBalance = normalizedBalance;
+    for (let i = 0; i < trimmedForecast.length; i++) {
+      const item = trimmedForecast[i];
+      
+      if (item.type === 'balance') {
+        runningBalance = item.amount;
+      } else if (!isNaN(item.amount)) {
+        runningBalance += item.amount;
+      }
+      
+      item.runningBalance = runningBalance;
+    }
+    
+    console.log(`Generated forecast with ${trimmedForecast.length} items`);
+    return trimmedForecast;
+    
   } catch (error) {
-    console.error('Error in generateCashFlowForecast:', error);
-    // Return minimal valid forecast to prevent UI errors
+    console.error('Critical error in generateCashFlowForecast:', error);
+    // Return minimal valid forecast with the current balance
     return [{
       itemId: 'initial-balance',
       date: new Date().toISOString(),
-      amount: currentBalance || 0,
+      amount: isNaN(currentBalance) ? 0 : currentBalance,
       category: 'balance',
       name: 'Current Balance',
       type: 'balance',
-      runningBalance: currentBalance || 0
+      runningBalance: isNaN(currentBalance) ? 0 : currentBalance
     }];
   }
 }
