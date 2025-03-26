@@ -10,6 +10,7 @@ graph TD
     B --> D[Layout Components]
     B --> E[Form Components]
     B --> F[Chart Components]
+    B --> V[Visualization Components]
     G[Hooks] --> H[Custom Hooks]
     G --> I[Context Providers]
     J[Utils] --> K[API Helpers]
@@ -63,6 +64,13 @@ graph LR
 - Responsive design patterns
 - Theme customization
 
+### 6. Visualizations
+- Component-based visualization system
+- Animation with CSS transitions and keyframes
+- Interactive elements with state feedback
+- Responsive sizing for different devices
+- Adaptable visualization types with shared props
+
 ## Component Organization
 
 ### Directory Structure
@@ -73,7 +81,8 @@ src/
 │   ├── ui/             # shadcn/ui components
 │   ├── layout/         # Layout components
 │   ├── forms/          # Form components
-│   └── charts/         # Data visualization
+│   ├── charts/         # Data visualization
+│   └── visualizations/ # Interactive visualizations
 ├── lib/                # Utility functions
 ├── hooks/              # Custom hooks
 ├── providers/          # Context providers
@@ -129,6 +138,32 @@ export function MainLayout({ children }) {
 }
 ```
 
+4. **Visualization Components**
+```typescript
+// components/visualizations/GoalVisualization.tsx
+export function GoalVisualization({
+  name,
+  saved,
+  target,
+  type = "jar",
+  ...props
+}) {
+  const percentage = Math.min(100, (saved / target) * 100);
+  
+  return (
+    <Card>
+      <CardHeader>{name}</CardHeader>
+      <CardContent>
+        {type === "jar" && <JarVisualization percentage={percentage} />}
+        {type === "adventure" && <AdventureMap percentage={percentage} />}
+        {/* other visualization types */}
+        <Progress value={percentage} />
+      </CardContent>
+    </Card>
+  );
+}
+```
+
 ## Data Models
 
 ### User Profile
@@ -169,6 +204,72 @@ interface Budget {
   period: 'monthly' | 'yearly';
   familyId: string;
   shared: boolean;
+}
+```
+
+### Savings Goal
+```typescript
+interface SavingsGoal {
+  id: string;
+  name: string;
+  category?: string;
+  saved: number;
+  target: number;
+  type: 'adventure' | 'jar' | 'envelope' | 'balloon';
+  checkpoints?: Array<{
+    amount: number;
+    label: string;
+  }>;
+  linkedExpenseId?: string;
+  userId: string;
+  familyId?: string;
+  isShared: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### User Settings
+```typescript
+interface UserSettings {
+  theme: 'light' | 'dark' | 'system';
+  currency: string;
+  notifications: boolean;
+  advancedSavingsMode: boolean; // Flag for Advanced Savings and Forecasting
+  dashboardLayout: 'default' | 'compact' | 'detailed';
+}
+```
+
+## Specialized Patterns
+
+### Savings Goal Visualization
+- Shared props interface for all visualization types
+- Percentage calculation logic
+- Status determination (start, progress, near, complete)
+- Animation triggers based on state changes
+- Theme-aware styling with Tailwind
+
+### Advanced Savings Mode
+```typescript
+// hooks/useAdvancedSavings.ts
+export function useAdvancedSavings() {
+  const { profile } = useProfile();
+  const { goals } = useGoals();
+  
+  const isAdvancedMode = profile?.settings?.advancedSavingsMode || false;
+  
+  const totalBalance = profile?.currentBalance || 0;
+  const reservedForGoals = isAdvancedMode 
+    ? goals.reduce((sum, goal) => sum + (goal.target - goal.saved), 0)
+    : 0;
+  const availableBalance = totalBalance - reservedForGoals;
+  
+  return {
+    isAdvancedMode,
+    totalBalance,
+    reservedForGoals,
+    availableBalance
+  };
 }
 ```
 
@@ -218,3 +319,9 @@ export const transactionSchema = z.object({
 - Tree shaking
 - Dynamic imports
 - Asset optimization 
+
+4. **Visualization Optimization**
+- Minimal re-renders with useMemo for calculations
+- CSS animations over JavaScript for performance
+- SVG optimization for adventure map paths
+- Conditional rendering of complex animation elements 

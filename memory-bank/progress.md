@@ -27,6 +27,14 @@
 - [x] Form components
 - [x] Toast notifications
 
+### 4. Goals and Savings
+- [x] Interactive savings goals
+- [x] Multiple visualization types (adventure map, jar, envelope, balloon)
+- [x] Progress tracking
+- [x] Goal form with validation
+- [x] Visual animations and feedback
+- [x] Category organization
+
 ## In Progress
 
 ### 1. Transaction Management
@@ -73,11 +81,19 @@
 
 ### 3. Advanced Features
 - [ ] Bill reminders
-- [ ] Savings goals
+- [x] Savings goals
 - [ ] Investment tracking
 - [ ] Debt management
 - [ ] Financial calendar
 - [ ] Document storage
+
+### 4. Advanced Savings and Forecasting
+- [ ] User toggle for advanced mode
+- [ ] Dual balance display (current vs. available after goals)
+- [ ] Two-line forecasting visuals
+- [ ] Goal-linked expense adjustment
+- [ ] Enhanced cash flow projections
+- [ ] User preference persistence
 
 ## Technical Debt
 
@@ -147,7 +163,7 @@
 - [ ] Reports and analytics
 - [ ] Financial insights
 - [ ] Bill management
-- [ ] Goals tracking
+- [x] Goals tracking
 - [ ] Investment monitoring
 - [ ] Document management
 
@@ -158,6 +174,14 @@
 - [ ] Localization
 - [ ] Advanced security
 - [ ] Premium features
+
+### Milestone 5: Advanced Savings and Forecasting
+- [ ] User preferences for advanced mode
+- [ ] Dual balance display system
+- [ ] Enhanced forecasting with goal integration
+- [ ] Goal-linked expense adjustment
+- [ ] Advanced visualization options
+- [ ] Cross-device persistence of settings
 
 ## Next Actions
 
@@ -180,4 +204,5 @@
 2. Advanced financial features
 3. Third-party integrations
 4. Premium features
-5. International expansion 
+5. International expansion
+6. Advanced savings and forecasting integration 
