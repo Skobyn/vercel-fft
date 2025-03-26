@@ -275,14 +275,16 @@ export function useBills() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setBillsLoading] = useState(true);
   const [error, setFetchError] = useState<any>(null);
-  let mounted = true;
 
   const fetchBills = useCallback(async () => {
     if (!user) {
       console.log("fetchBills: No user logged in");
+      setBills([]);
+      setBillsLoading(false);
       return;
     }
     
+    let mounted = true; // This ensures we don't update state if the component unmounts
     setBillsLoading(true);
     setFetchError(null);
     
@@ -291,9 +293,9 @@ export function useBills() {
       const userBills = await FinancialService.getBills(user.uid);
       
       if (mounted) {
+        console.log(`Successfully fetched ${userBills.length} bills:`, userBills);
         setBills(userBills);
         setBillsLoading(false);
-        console.log(`Successfully fetched ${userBills.length} bills`);
       }
     } catch (error) {
       console.error("Error fetching bills:", error);
@@ -303,6 +305,10 @@ export function useBills() {
         setBills([]);
       }
     }
+    
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const addBill = useCallback(async (bill: Omit<Bill, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
@@ -312,7 +318,16 @@ export function useBills() {
     }
 
     try {
-      const newBill = await FinancialService.addBill(bill, user.uid);
+      // Make sure isRecurring is set based on frequency
+      const fullBill = {
+        ...bill,
+        isRecurring: bill.frequency !== 'once'
+      };
+      
+      console.log('Adding bill with data:', fullBill);
+      const newBill = await FinancialService.addBill(fullBill, user.uid);
+      console.log('Successfully added bill:', newBill);
+      
       setBills(prev => [newBill, ...prev].sort((a, b) => 
         new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       ));

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -47,6 +47,7 @@ const billFormSchema = z.object({
   }),
   isPaid: z.boolean().default(false),
   frequency: z.string().min(1, "Frequency is required"),
+  isRecurring: z.boolean().default(false),
   autoPay: z.boolean().default(false),
   notes: z.string().optional(),
 });
@@ -75,6 +76,7 @@ export default function BillForm({
     dueDate: bill?.dueDate ? new Date(bill.dueDate) : new Date(),
     isPaid: bill?.isPaid || false,
     frequency: bill?.frequency || "monthly",
+    isRecurring: bill?.isRecurring ?? bill?.frequency !== 'once',
     autoPay: bill?.autoPay || false,
     notes: bill?.notes || "",
   };
@@ -85,8 +87,22 @@ export default function BillForm({
     mode: "onChange",
   });
 
+  // Watch frequency to update isRecurring automatically
+  const frequency = form.watch("frequency");
+  
+  useEffect(() => {
+    // Automatically set isRecurring based on frequency
+    form.setValue("isRecurring", frequency !== "once");
+  }, [frequency, form]);
+
   const handleSubmit = (values: BillFormValues) => {
-    onSubmit(values);
+    // Ensure isRecurring is set based on frequency for consistent data
+    const submissionValues = {
+      ...values,
+      isRecurring: values.frequency !== "once"
+    };
+    console.log('Submitting bill form with data:', submissionValues);
+    onSubmit(submissionValues);
   };
 
   return (

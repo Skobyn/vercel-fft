@@ -151,13 +151,19 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
   // Show loading state if data is still loading
   if (loading || isGeneratingForecast || !chartReady) {
     return (
-      <Card className="col-span-2 h-[400px] flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-muted-foreground">
-            {loading ? "Loading financial data..." : "Generating forecast..."}
-          </p>
-        </div>
+      <Card className="col-span-2 h-[400px]">
+        <CardHeader>
+          <CardTitle>Cash Flow Forecast</CardTitle>
+          <CardDescription>Loading your financial data...</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px] flex items-center justify-center">
+          <div className="text-center">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-muted-foreground">
+              {loading ? "Loading your financial data..." : "Generating your cash flow forecast..."}
+            </p>
+          </div>
+        </CardContent>
       </Card>
     );
   }
@@ -268,53 +274,47 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
         
         <div className="h-[300px]">
           {chartData.length > 1 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{
-                  top: 5,
-                  right: 5,
-                  left: 5,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }} 
-                  tickFormatter={(value) => {
-                    try {
-                      return value.split('/').slice(0, 2).join('/');
-                    } catch (e) {
-                      return '';
-                    }
-                  }}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }} 
-                  tickFormatter={(value) => {
-                    try {
-                      return formatCurrency(value).split('.')[0];
-                    } catch (e) {
-                      return '';
-                    }
-                  }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine 
-                  y={0} 
-                  stroke="red" 
-                  strokeDasharray="3 3" 
-                />
-                <Area
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="#3b82f6"
-                  fill="#3b82f680"
-                  activeDot={{ r: 6 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="h-full">
+              {/* Fallback to simple display if chart doesn't render */}
+              <div className="flex flex-col h-full">
+                <div className="flex justify-between items-center mb-2">
+                  <div>
+                    <p className="text-sm font-semibold">Start: {formatCurrency(startingBalance)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(new Date().toISOString(), "long")}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">End: {formatCurrency(endBalance)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {chartData.length > 0 && chartData[chartData.length - 1].date}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex-1 bg-gray-50 rounded-md p-4 overflow-auto">
+                  <ul className="space-y-2">
+                    {forecastData.map((item, i) => (
+                      <li key={i} className="flex justify-between border-b pb-1">
+                        <div>
+                          <span className="text-sm">
+                            {item.name} ({formatDate(item.date, "short")})
+                          </span>
+                        </div>
+                        <div className="flex gap-4">
+                          <span className={`text-sm ${item.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(item.amount)}
+                          </span>
+                          <span className="text-sm font-medium">
+                            {formatCurrency(item.runningBalance || 0)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">

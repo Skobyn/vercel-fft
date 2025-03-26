@@ -14,7 +14,7 @@ import { SetupGuide } from "@/components/onboarding/setup-guide";
 import { useFinancialProfile, useIncomes } from "@/hooks/use-financial-data";
 import { FinancialProfile } from "@/types/financial";
 import { ArrowRight, X } from "lucide-react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase-client";
 import { toast } from "sonner";
 import { initializeCollections } from '@/utils/database-debug';
@@ -100,6 +100,8 @@ export default function DashboardPage() {
         
         await setDoc(profileRef, defaultProfile);
         console.log("Created default financial profile");
+      } else {
+        console.log("Financial profile already exists for user:", userId);
       }
       
       // Create empty collections if they don't exist
@@ -114,12 +116,24 @@ export default function DashboardPage() {
       
       // Create a placeholder document in each collection
       for (const collection of collections) {
-        const placeholderRef = doc(db, collection.path, '_metadata');
-        await setDoc(placeholderRef, { 
-          created: new Date().toISOString(),
-          note: 'This document ensures the collection exists'
-        }, { merge: true });
-        console.log(`Initialized collection: ${collection.name}`);
+        try {
+          const collectionRef = collection(db, collection.path);
+          const docsSnapshot = await getDocs(collectionRef);
+          
+          // If collection is empty (except for potential _metadata), create placeholder
+          if (docsSnapshot.docs.length === 0 || (docsSnapshot.docs.length === 1 && docsSnapshot.docs[0].id === '_metadata')) {
+            const placeholderRef = doc(db, collection.path, '_metadata');
+            await setDoc(placeholderRef, { 
+              created: new Date().toISOString(),
+              note: 'This document ensures the collection exists'
+            }, { merge: true });
+            console.log(`Initialized collection: ${collection.name}`);
+          } else {
+            console.log(`Collection ${collection.name} already has data`);
+          }
+        } catch (err) {
+          console.error(`Error initializing collection ${collection.name}:`, err);
+        }
       }
     } catch (error) {
       console.error("Error initializing collections:", error);

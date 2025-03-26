@@ -47,16 +47,20 @@ export default function AddIncomeForm({ onAddIncome }: AddIncomeFormProps) {
     try {
       setIsSubmitting(true);
       
-      // Convert amount to number and add required fields
+      // Format the data correctly for the API
       const formattedData = {
-        ...data,
+        name: data.name,
         amount: parseFloat(data.amount),
         date: new Date().toISOString(),
+        frequency: data.frequency,
         isRecurring: data.frequency !== 'once',
+        category: data.category,
         notes: '',
       };
       
+      console.log('Submitting income with data:', formattedData);
       await onAddIncome(formattedData);
+      console.log('Income added successfully');
       form.reset();
     } catch (error) {
       console.error("Error adding income:", error);
