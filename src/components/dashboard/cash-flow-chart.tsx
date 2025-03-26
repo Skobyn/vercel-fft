@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { CalendarIcon, TrendingDown, TrendingUp, AlertCircle } from "lucide-react";
+import { CalendarIcon, TrendingDown, TrendingUp, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -226,31 +226,21 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
     ? ((endBalance - startingBalance) / Math.abs(startingBalance || 1)) * 100 
     : 0;
 
-  // Simple tooltip component to avoid complex calculations
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length > 0) {
-      try {
-        const data = payload[0].payload;
-        return (
-          <div className="bg-white p-3 border rounded-md shadow-sm">
-            <p className="font-medium">{formatDate(data.date, "long")}</p>
-            <p className="text-sm font-medium">
-              Balance: {formatCurrency(data.balance || 0)}
-            </p>
-          </div>
-        );
-      } catch (err) {
-        return <div className="bg-white p-3 border rounded-md shadow-sm">Error displaying data</div>;
-      }
-    }
-    return null;
-  };
-
-  // Create simple data for chart
-  const chartData = forecastData.map((item) => ({
-    date: new Date(item.date).toLocaleDateString(),
-    balance: item.runningBalance || 0,
-  }));
+  // Create simple data for chart with event markers
+  const chartData = forecastData.map((item) => {
+    const isEvent = item.type === 'income' || item.type === 'expense';
+    
+    return {
+      date: new Date(item.date).toLocaleDateString(),
+      balance: item.runningBalance || 0,
+      // Add event details for tooltip
+      isEvent: isEvent,
+      eventType: item.type,
+      eventName: item.name,
+      eventAmount: item.amount,
+      eventCategory: item.category
+    };
+  });
 
   return (
     <Card className="col-span-2">
@@ -316,7 +306,7 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
                   tickLine={false}
                   tickMargin={10}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<EnhancedTooltip />} />
                 <ReferenceLine y={0} stroke="#666" opacity={0.3} />
                 <Area 
                   type="monotone" 
@@ -325,6 +315,13 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
                   fillOpacity={1} 
                   fill="url(#colorBalance)"
                   strokeWidth={2}
+                />
+                <ReferenceLine y={0} stroke="#666" opacity={0.3} />
+                <Area 
+                  type="monotone" 
+                  dataKey="balance"
+                  stroke="transparent"
+                  fill="transparent"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -344,4 +341,44 @@ export function CashFlowChart({ days = 90 }: CashFlowChartProps) {
       </CardContent>
     </Card>
   );
+}
+
+// Enhanced tooltip to show event details
+function EnhancedTooltip({ active, payload }: any) {
+  if (active && payload && payload.length > 0) {
+    try {
+      const data = payload[0].payload;
+      
+      return (
+        <div className="bg-white p-3 border rounded-md shadow-sm">
+          <p className="font-medium">{formatDate(data.date, "long")}</p>
+          <p className="text-sm font-medium">
+            Balance: {formatCurrency(data.balance || 0)}
+          </p>
+          
+          {data.isEvent && (
+            <div className="mt-2 pt-2 border-t">
+              <div className="flex items-center gap-1">
+                {data.eventType === 'income' ? (
+                  <ArrowUp className="h-3 w-3 text-emerald-500" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 text-rose-500" />
+                )}
+                <p className="font-medium text-xs">
+                  {data.eventName}
+                </p>
+              </div>
+              <p className="text-xs">
+                {formatCurrency(Math.abs(data.eventAmount))} 
+                <span className="text-muted-foreground ml-1">({data.eventCategory})</span>
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    } catch (err) {
+      return <div className="bg-white p-3 border rounded-md shadow-sm">Error displaying data</div>;
+    }
+  }
+  return null;
 } 

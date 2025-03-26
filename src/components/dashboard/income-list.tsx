@@ -69,10 +69,20 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Sort by date
-  const sortedIncomes = [...incomes].sort((a, b) => {
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
+  // Get today's date and 30 days from now
+  const today = new Date();
+  const nextMonth = new Date();
+  nextMonth.setDate(today.getDate() + 30);
+  
+  // Filter for incomes due within the next 30 days
+  const upcomingIncomes = incomes
+    .filter(income => {
+      const incomeDate = new Date(income.date);
+      return incomeDate <= nextMonth && incomeDate >= today;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const incomesRemainingCount = incomes.length - upcomingIncomes.length;
 
   const handleOpenEditDialog = (income: Income) => {
     setEditIncome(income);
@@ -166,13 +176,13 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Income</CardTitle>
+        <CardTitle>Expected Income</CardTitle>
         <CardDescription>
-          Manage your regular and one-time income sources
+          Expected in the next 30 days
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {sortedIncomes.length === 0 ? (
+        {incomes.length === 0 ? (
           <div className="text-center py-10">
             <Calendar className="mx-auto h-12 w-12 text-muted-foreground opacity-20" />
             <h3 className="mt-4 text-lg font-semibold">No income added</h3>
@@ -180,110 +190,93 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
               Add your income sources to track your cash flow
             </p>
           </div>
+        ) : upcomingIncomes.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
+            <Calendar className="mx-auto h-12 w-12 opacity-20 mb-2" />
+            <p>No income expected in the next 30 days</p>
+            <p className="text-xs mt-1">You have {incomes.length} income sources configured</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {sortedIncomes.map((income) => {
-              const upcoming = !isPast(income.date);
-              const soon = isComingSoon(income.date);
-              
-              return (
-                <div
-                  key={income.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div className="grid gap-1">
-                    <div className="font-semibold">{income.name}</div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {income.category}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {FREQUENCY_LABEL[income.frequency] || income.frequency}
-                      </Badge>
-                      <Badge 
-                        variant="secondary" 
-                        className={`text-xs ${
-                          upcoming 
-                            ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-100"
-                        }`}
-                      >
-                        {upcoming ? "Upcoming" : "Past"}
-                      </Badge>
-                      <span className="text-xs">
-                        {format(parseISO(income.date), "MMM d, yyyy")}
-                      </span>
-                    </div>
-                    {income.notes && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        <Info className="h-3 w-3 inline-block mr-1" />
-                        {income.notes}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="font-semibold text-green-600">
-                      {formatCurrency(income.amount)}
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleOpenEditDialog(income)}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDeleteClick(income.id)}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            {upcomingIncomes.map((income) => (
+              <div
+                key={income.id}
+                className="flex items-center justify-between border-b last:border-b-0 pb-3 last:pb-0"
+              >
+                <div className="space-y-1">
+                  <div className="font-medium">{income.name}</div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>
+                      Expected {format(parseISO(income.date), "MMM d, yyyy")}
+                      {isComingSoon(income.date) && (
+                        <Badge variant="outline" className="ml-2 text-xs">Soon</Badge>
+                      )}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-green-600">{formatCurrency(income.amount)}</p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleOpenEditDialog(income)}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteClick(income.id)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+            
+            {incomesRemainingCount > 0 && (
+              <div className="pt-2 text-center">
+                <Button variant="link" size="sm" asChild>
+                  <a href="/income">View all income sources</a>
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
 
-      {/* Edit Dialog */}
-      {editIncome && (
-        <AlertDialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <AlertDialogContent className="max-w-md">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Edit Income</AlertDialogTitle>
-            </AlertDialogHeader>
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Income</DialogTitle>
+          </DialogHeader>
+          {editIncome && (
             <IncomeForm
               income={editIncome}
               onSubmit={handleSubmit}
               onCancel={() => setEditDialogOpen(false)}
+              isSubmitting={isSubmitting}
             />
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Income</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this income from your records.
+              Are you sure you want to delete this income? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

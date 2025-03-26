@@ -14,9 +14,14 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Calendar as CalendarIcon, CheckCircle, ChevronRight, HelpCircle, Plus } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, CheckCircle, ChevronRight, HelpCircle, Plus, Database } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { useRouter } from "next/navigation";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { BulkBillsEditor } from "@/components/forms/bulk-bills-editor";
+import { useExpenses } from "@/hooks/use-financial-data";
+import { toast } from "sonner";
 
 // Type definitions
 type BillFrequency = "weekly" | "monthly" | "quarterly" | "annual" | "one-time";
@@ -62,6 +67,9 @@ const expenseCategories: ExpenseCategory[] = [
 
 // Main component
 export default function BillsExpensesPage() {
+  const router = useRouter();
+  const { addExpense } = useExpenses();
+  
   // Guide steps state
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 5;
@@ -83,6 +91,9 @@ export default function BillsExpensesPage() {
   const [specialExpensePerson, setSpecialExpensePerson] = useState("");
   const [specialExpenseDate, setSpecialExpenseDate] = useState<Date | undefined>(new Date());
   const [specialExpenseBudget, setSpecialExpenseBudget] = useState("");
+  
+  // Bulk editor state
+  const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
   
   // Navigation functions
   const nextStep = () => {
@@ -137,6 +148,31 @@ export default function BillsExpensesPage() {
     setCurrentStep(1);
   };
   
+  const handleBulkEdit = () => {
+    setBulkEditorOpen(true);
+  };
+  
+  const handleSaveBulkItems = async (items: any[]) => {
+    try {
+      for (const expense of items) {
+        await addExpense({
+          name: expense.name,
+          amount: expense.amount,
+          category: expense.category,
+          date: expense.date,
+          isPlanned: true,
+          notes: expense.notes || ""
+        });
+      }
+      toast.success(`${items.length} expenses saved successfully`);
+      setBulkEditorOpen(false);
+      router.push('/bills'); // Navigate back to bills page
+    } catch (error) {
+      console.error("Error saving bulk expenses:", error);
+      toast.error("Failed to save all expenses. Please try again.");
+    }
+  };
+  
   // Helper function to get weekly options
   const getWeeklyOptions = () => {
     return [
@@ -153,11 +189,23 @@ export default function BillsExpensesPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Bills & Expenses</h1>
-          <p className="text-muted-foreground">
-            Track your recurring bills and plan for special expenses
-          </p>
+        <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Bills & Expenses</h1>
+            <p className="text-muted-foreground">
+              Track your recurring bills and plan for special expenses
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/bills')}>
+              Go Back
+            </Button>
+            <Button variant="outline" onClick={handleBulkEdit}>
+              <Database className="h-4 w-4 mr-2" />
+              Bulk Add
+            </Button>
+          </div>
         </div>
         
         <Card className="w-full max-w-4xl mx-auto">
@@ -726,6 +774,18 @@ export default function BillsExpensesPage() {
             </Button>
           </CardFooter>
         </Card>
+        
+        {/* Bulk Editor Dialog */}
+        <Dialog open={bulkEditorOpen} onOpenChange={setBulkEditorOpen}>
+          <DialogContent className="sm:max-w-[95vw] max-h-[95vh] overflow-y-auto">
+            <BulkBillsEditor
+              type="expenses"
+              onSave={handleSaveBulkItems}
+              onCancel={() => setBulkEditorOpen(false)}
+              existingItems={[]}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

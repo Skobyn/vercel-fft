@@ -254,12 +254,16 @@ export function generateCashFlowForecast(
 }
 
 /**
- * Formats a currency value
+ * Formats a number as currency
  */
 export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  if (isNaN(amount)) return '$0.00';
+  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(amount);
 }
 
@@ -413,4 +417,111 @@ export function daysUntil(dateString: string): number {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   return Math.max(diffDays, 0); // Don't return negative days
+}
+
+/**
+ * Exports data to a CSV file
+ * @param data Array of objects to export
+ * @param fileName Name of the file to download
+ */
+export function exportToCSV(data: any[], fileName: string): void {
+  // Get headers from first row
+  const headers = Object.keys(data[0] || {});
+  
+  // Convert data to CSV rows
+  const csvRows = [
+    // Header row
+    headers.join(','),
+    // Data rows
+    ...data.map(row => 
+      headers.map(header => {
+        // Handle values with commas by wrapping in quotes
+        const value = row[header] === null || row[header] === undefined ? '' : row[header];
+        const escaped = String(value).replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')
+    )
+  ];
+  
+  // Create blob and download link
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  // Create temporary link and trigger download
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', fileName);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Parses a CSV string into an array of objects
+ * @param csvString The CSV string to parse
+ * @returns Array of objects with headers as keys
+ */
+export function parseCSV(csvString: string): any[] {
+  // Split into lines and handle empty input
+  const lines = csvString.trim().split('\n');
+  if (lines.length === 0) return [];
+  
+  // Parse headers from first line
+  const headers = parseCSVLine(lines[0]);
+  
+  // Parse data rows
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const obj: Record<string, any> = {};
+    const values = parseCSVLine(lines[i]);
+    
+    if (values.length === headers.length) {
+      for (let j = 0; j < headers.length; j++) {
+        obj[headers[j]] = values[j] === '' ? null : values[j];
+      }
+      result.push(obj);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Parse a single CSV line, handling quoted values with commas
+ * @param line CSV line to parse
+ * @returns Array of values from the line
+ */
+function parseCSVLine(line: string): string[] {
+  const result = [];
+  let currentValue = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      // Check if this is an escaped quote
+      if (i + 1 < line.length && line[i + 1] === '"') {
+        currentValue += '"';
+        i++; // Skip the next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // End of value
+      result.push(currentValue);
+      currentValue = '';
+    } else {
+      // Normal character
+      currentValue += char;
+    }
+  }
+  
+  // Add the last value
+  result.push(currentValue);
+  
+  return result;
 } 

@@ -35,6 +35,7 @@ type BudgetCategory = {
   icon?: string;
   color?: string;
   category?: string;
+  frequency: string;
 };
 
 export default function BudgetsPage() {
@@ -50,6 +51,8 @@ export default function BudgetsPage() {
   const [searchText, setSearchText] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table" | "chart">("cards");
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [displayFrequency, setDisplayFrequency] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [budgetFrequency, setBudgetFrequency] = useState<"once" | "daily" | "weekly" | "biweekly" | "monthly">("monthly");
 
   // Sample predefined categories
   const predefinedCategories = [
@@ -76,9 +79,43 @@ export default function BudgetsPage() {
         spent: budget.spent || 0,
         icon: budget.icon || getCategoryIcon(budget.category),
         color: budget.color || getCategoryColor(budget.category),
-        category: budget.category
+        category: budget.category,
+        frequency: budget.frequency || "monthly"
       }))
     : [];
+
+  // Helper function to adjust budget amount based on display frequency
+  const adjustAmountForFrequency = (amount: number, budgetFreq: string = "monthly"): number => {
+    // Convert all values to daily first
+    let dailyAmount: number;
+    
+    switch (budgetFreq) {
+      case "daily":
+        dailyAmount = amount;
+        break;
+      case "weekly":
+        dailyAmount = amount / 7;
+        break;
+      case "biweekly":
+        dailyAmount = amount / 14;
+        break;
+      case "monthly":
+      default:
+        dailyAmount = amount / 30; // Using 30 days as average month length
+        break;
+    }
+    
+    // Now convert daily amount to the selected display frequency
+    switch (displayFrequency) {
+      case "daily":
+        return dailyAmount;
+      case "weekly":
+        return dailyAmount * 7;
+      case "monthly":
+      default:
+        return dailyAmount * 30;
+    }
+  };
 
   // Helper to get icon for category
   function getCategoryIcon(categoryValue: string): string {
@@ -98,8 +135,11 @@ export default function BudgetsPage() {
   );
 
   // Calculate total budgeted and spent
-  const totalBudgeted = budgetCategories.reduce((sum, category) => sum + category.budgeted, 0);
-  const totalSpent = budgetCategories.reduce((sum, category) => sum + (category.spent || 0), 0);
+  const totalBudgeted = budgetCategories.reduce((sum, category) => 
+    sum + adjustAmountForFrequency(category.budgeted, category.frequency), 0);
+  
+  const totalSpent = budgetCategories.reduce((sum, category) => 
+    sum + adjustAmountForFrequency(category.spent || 0, category.frequency), 0);
 
   // Check if this is the first time viewing budgets
   useEffect(() => {
@@ -139,6 +179,7 @@ export default function BudgetsPage() {
         icon: categoryInfo?.icon || "📊",
         color: categoryInfo?.color || "bg-gray-500",
         month: selectedMonth,
+        frequency: budgetFrequency,
         createdAt: new Date().toISOString()
       };
 
@@ -148,6 +189,7 @@ export default function BudgetsPage() {
       setBudgetName("");
       setBudgetAmount("");
       setBudgetCategory("");
+      setBudgetFrequency("monthly");
 
       // Close dialog
       setOpenNewBudgetDialog(false);
@@ -200,65 +242,107 @@ export default function BudgetsPage() {
               Set and track budgets for every category
             </p>
           </div>
-          <Dialog open={openNewBudgetDialog} onOpenChange={setOpenNewBudgetDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Budget
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Add New Budget Category</DialogTitle>
-                <DialogDescription>
-                  Create a new budget category to track your spending.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="budgetName">Category Name</Label>
-                  <Input
-                    id="budgetName"
-                    value={budgetName}
-                    onChange={(e) => setBudgetName(e.target.value)}
-                    placeholder="e.g. Groceries"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Monthly Budget</Label>
-                  <Input
-                    id="amount"
-                    value={budgetAmount}
-                    onChange={(e) => setBudgetAmount(e.target.value)}
-                    placeholder="0.00"
-                    type="number"
-                    step="0.01"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">Parent Category</Label>
-                  <Select value={budgetCategory} onValueChange={setBudgetCategory}>
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select Parent Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {predefinedCategories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
-                          {category.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpenNewBudgetDialog(false)}>
-                  Cancel
+          <div className="flex items-center gap-2">
+            <Select value={displayFrequency} onValueChange={(value: "daily" | "weekly" | "monthly") => setDisplayFrequency(value)}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue placeholder="Frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+            <Dialog open={openNewBudgetDialog} onOpenChange={setOpenNewBudgetDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Budget
                 </Button>
-                <Button onClick={handleAddBudget}>Add Budget</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Budget</DialogTitle>
+                  <DialogDescription>
+                    Set a budget for a specific category to track your spending.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="budget-name" className="text-right">
+                      Name
+                    </Label>
+                    <Input
+                      id="budget-name"
+                      value={budgetName}
+                      onChange={(e) => setBudgetName(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="budget-amount" className="text-right">
+                      Amount
+                    </Label>
+                    <Input
+                      id="budget-amount"
+                      type="number"
+                      value={budgetAmount}
+                      onChange={(e) => setBudgetAmount(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="budget-frequency" className="text-right">
+                      Frequency
+                    </Label>
+                    <Select 
+                      value={budgetFrequency} 
+                      onValueChange={(value: "once" | "daily" | "weekly" | "biweekly" | "monthly") => setBudgetFrequency(value)}
+                    >
+                      <SelectTrigger id="budget-frequency" className="col-span-3">
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="once">One-Time</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="budget-category" className="text-right">
+                      Category
+                    </Label>
+                    <Select
+                      value={budgetCategory}
+                      onValueChange={setBudgetCategory}
+                    >
+                      <SelectTrigger id="budget-category" className="col-span-3">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {predefinedCategories.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>
+                            <div className="flex items-center">
+                              <span className="mr-2">{category.icon}</span>
+                              <span>{category.label}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" onClick={handleAddBudget}>
+                    Create Budget
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Budget Setup Guide */}
@@ -409,51 +493,52 @@ export default function BudgetsPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredBudgetCategories.map((category) => (
-                  <Card key={category.id}>
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${category.color || 'bg-gray-500'}`}>
-                            <span>{category.icon || '📊'}</span>
-                          </div>
-                          <CardTitle className="text-base">{category.name}</CardTitle>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredBudgetCategories.map((category) => {
+                  const adjustedBudget = adjustAmountForFrequency(category.budgeted, category.frequency);
+                  const adjustedSpent = adjustAmountForFrequency(category.spent, category.frequency);
+                  const percentSpent = adjustedBudget > 0 ? (adjustedSpent / adjustedBudget) * 100 : 0;
+                  
+                  return (
+                    <Card key={category.id} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center text-lg">
+                          <span className="mr-2">{category.icon}</span>
+                          {category.name}
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2">
+                          <span className={`inline-block w-3 h-3 rounded-full ${category.color}`}></span>
+                          {predefinedCategories.find(c => c.value === category.category)?.label || category.category}
+                          <span className="text-xs">({category.frequency})</span>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">Budget ({displayFrequency})</span>
+                          <span className="font-medium">${adjustedBudget.toFixed(2)}</span>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-3">
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="text-sm text-muted-foreground">
-                          ${category.spent || 0} of ${category.budgeted}
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">Spent ({displayFrequency})</span>
+                          <span className="font-medium">${adjustedSpent.toFixed(2)}</span>
                         </div>
-                        <div className="text-sm font-medium">
-                          {category.spent ? Math.round((category.spent / category.budgeted) * 100) : 0}%
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-2 ${getStatusColor(adjustedBudget, adjustedSpent)}`}
+                            style={{ width: `${Math.min(100, percentSpent)}%` }}
+                          ></div>
                         </div>
-                      </div>
-                      <div className="mt-2 h-2 rounded-full bg-secondary overflow-hidden">
-                        <div
-                          className={`h-full ${getStatusColor(category.budgeted, category.spent || 0)}`}
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              Math.round((category.spent || 0) / category.budgeted * 100)
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                      {category.spent > category.budgeted && (
-                        <div className="flex items-center gap-1 mt-2 text-red-500 text-xs">
-                          <AlertTriangle className="h-3 w-3" />
-                          <span>Over budget by ${(category.spent - category.budgeted).toFixed(2)}</span>
+                        <div className="flex justify-between mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {Math.min(100, percentSpent).toFixed(0)}% spent
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ${(adjustedBudget - adjustedSpent).toFixed(2)} remaining
+                          </span>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </>

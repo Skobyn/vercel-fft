@@ -126,8 +126,21 @@ export function BillsList() {
     }
   };
 
-  // Filter unpaid bills
+  // Filter unpaid bills due in the next 7 days
   const unpaidBills = bills.filter(bill => !bill.isPaid);
+  
+  // Get today's date and 7 days from now
+  const today = new Date();
+  const nextWeek = new Date();
+  nextWeek.setDate(today.getDate() + 7);
+  
+  // Filter for bills due within the next 7 days
+  const upcomingBills = unpaidBills.filter(bill => {
+    const dueDate = new Date(bill.dueDate);
+    return dueDate <= nextWeek;
+  }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  
+  const billsRemainingCount = unpaidBills.length - upcomingBills.length;
 
   if (loading) {
     return (
@@ -163,8 +176,8 @@ export function BillsList() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Bills</CardTitle>
-            <CardDescription>Manage your upcoming bills</CardDescription>
+            <CardTitle>Upcoming Bills</CardTitle>
+            <CardDescription>Due in the next 7 days</CardDescription>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -202,80 +215,82 @@ export function BillsList() {
               Add your first bill
             </Button>
           </div>
+        ) : upcomingBills.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
+            <CalendarCheck className="mx-auto h-12 w-12 opacity-20 mb-2" />
+            <p>No bills due in the next 7 days</p>
+            <p className="text-xs mt-1">You have {unpaidBills.length} bills due later</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {unpaidBills.map((bill) => {
-              const overdue = isOverdue(bill.dueDate);
-              const days = daysUntil(bill.dueDate);
-              
-              return (
-                <div
-                  key={bill.id}
-                  className={`flex justify-between items-center border rounded-lg p-3 hover:bg-muted/50 transition-colors ${
-                    overdue ? "border-red-200 bg-red-50" : days <= 3 ? "border-amber-200 bg-amber-50" : ""
-                  }`}
-                >
-                  <div className="flex flex-col gap-1">
-                    <div className="font-medium">{bill.name}</div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {bill.category}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {FREQUENCY_LABEL[bill.frequency] || bill.frequency}
-                      </Badge>
-                      {/* Check if bill is set for automatic payment */}
-                      {bill.autoPay && (
-                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">
-                          Auto Pay
-                        </Badge>
-                      )}
-                      <span className={`text-xs ${overdue ? "text-red-600 font-medium" : ""}`}>
-                        {overdue
-                          ? `Overdue by ${days} days`
-                          : days === 0
-                          ? "Due today"
-                          : `Due in ${days} days`}
-                      </span>
-                    </div>
-                  </div>
+            {upcomingBills.map((bill) => (
+              <div
+                key={bill.id}
+                className="flex items-center justify-between border-b last:border-b-0 pb-3 last:pb-0"
+                onClick={() => handlePayClick(bill.id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className="font-semibold text-red-600">
-                      {formatCurrency(bill.amount)}
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-green-600 border-green-200 hover:bg-green-50"
-                      onClick={() => handlePayClick(bill.id)}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Pay
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleOpenEditDialog(bill)}
-                        >
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDeleteClick(bill.id)}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <p className="font-medium">{bill.name}</p>
+                    {isOverdue(bill.dueDate) && (
+                      <Badge variant="destructive">Overdue</Badge>
+                    )}
+                    {bill.autoPay && <Badge variant="outline">Auto-pay</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <p>
+                      Due {formatDate(bill.dueDate, "long")} (
+                      {daysUntil(bill.dueDate)})
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold">{formatCurrency(bill.amount)}</p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditDialog(bill);
+                        }}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePayClick(bill.id);
+                        }}
+                      >
+                        Mark as Paid
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(bill.id);
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+
+            {billsRemainingCount > 0 && (
+              <div className="pt-2 text-center">
+                <Button variant="link" size="sm" asChild>
+                  <a href="/bills">View all {billsRemainingCount} additional bills</a>
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -283,17 +298,15 @@ export function BillsList() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Bill</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this bill from your records.
+              Are you sure you want to delete this bill? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -303,17 +316,14 @@ export function BillsList() {
       <AlertDialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark as Paid?</AlertDialogTitle>
+            <AlertDialogTitle>Mark as Paid</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark the bill as paid. For recurring bills, a new upcoming bill will be created.
+              Are you sure you want to mark this bill as paid?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmPay}
-              className="bg-green-600 hover:bg-green-700"
-            >
+            <AlertDialogAction onClick={confirmPay}>
               Mark as Paid
             </AlertDialogAction>
           </AlertDialogFooter>
