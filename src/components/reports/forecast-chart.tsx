@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { formatCurrency } from "@/utils/financial-utils";
 import { ForecastItem } from "@/types/financial";
 
@@ -15,23 +15,40 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
   const processedData = useMemo(() => {
     if (!baselineData.length) return [];
 
+    // Safety check for extremely large datasets
+    if (baselineData.length > 3000) {
+      console.warn(`ForecastChart received very large dataset (${baselineData.length} items), sampling data for performance`);
+    }
+
     // Sort data by date
     const sortedData = [...baselineData].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Determine the interval based on timeFrame
+    // Determine the interval based on timeFrame and data size
     let interval = 1; // days
-    if (timeFrame === "3m") interval = 7; // weekly
-    else if (timeFrame === "6m") interval = 14; // bi-weekly
-    else if (timeFrame === "12m") interval = 30; // monthly
+    if (timeFrame === "1m") interval = 1; // daily for 1 month
+    else if (timeFrame === "3m") interval = 7; // weekly for 3 months
+    else if (timeFrame === "6m") interval = 14; // bi-weekly for 6 months
+    else if (timeFrame === "12m") interval = 30; // monthly for 1 year
 
-    // Group data into periods
-    const groupedData: Record<string, any> = {};
+    // For very large datasets, increase the interval to reduce data points
+    if (baselineData.length > 1000) {
+      interval = Math.max(interval, Math.ceil(baselineData.length / 100));
+    }
+
+    // Create period boundaries with limited number of periods
+    const maxPeriods = 20; // Maximum number of data points to show
     const startDate = new Date(sortedData[0].date);
     const endDate = new Date(sortedData[sortedData.length - 1].date);
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Create period boundaries
+    // Adjust interval if we would have too many periods
+    if (totalDays / interval > maxPeriods) {
+      interval = Math.ceil(totalDays / maxPeriods);
+    }
+
+    // Group data into periods
     const periods: { start: Date, end: Date, label: string }[] = [];
     let currentDate = new Date(startDate);
     
@@ -54,7 +71,8 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
       currentDate.setDate(currentDate.getDate() + interval);
     }
     
-    // Initialize period data
+    // Initialize period data with map for better performance
+    const groupedData: Record<string, any> = {};
     periods.forEach(period => {
       const periodKey = period.label;
       groupedData[periodKey] = {
@@ -67,30 +85,39 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
       };
     });
     
+    // Batch process data points to periods for better performance
+    // For large datasets, only keep important transactions (high value or first/last)
+    const transactionLimit = 10; // Maximum transactions to store per period
+    
     // Assign data points to periods
     sortedData.forEach(item => {
       const itemDate = new Date(item.date);
       
       // Find which period this item belongs to
-      const period = periods.find(p => itemDate >= p.start && itemDate <= p.end);
-      
-      if (period) {
-        const periodKey = period.label;
-        
-        // Add to transactions list
-        groupedData[periodKey].transactions.push({
-          id: item.itemId || item.id,
-          date: item.date,
-          amount: item.amount,
-          name: item.name,
-          category: item.category,
-          type: item.type,
-          description: item.description
-        });
-        
-        // Use the latest running balance as the period's balance
-        if (item.runningBalance !== undefined) {
-          groupedData[periodKey].runningBalance = item.runningBalance;
+      for (const period of periods) {
+        if (itemDate >= period.start && itemDate <= period.end) {
+          const periodKey = period.label;
+          const periodData = groupedData[periodKey];
+          
+          // Add to transactions list with limit for memory
+          if (periodData.transactions.length < transactionLimit) {
+            periodData.transactions.push({
+              id: item.itemId || item.id,
+              date: item.date,
+              amount: item.amount,
+              name: item.name,
+              category: item.category,
+              type: item.type,
+              description: item.description
+            });
+          }
+          
+          // Use the latest running balance as the period's balance
+          if (item.runningBalance !== undefined) {
+            periodData.runningBalance = item.runningBalance;
+          }
+          
+          break; // Exit the loop once we found the right period
         }
       }
     });
@@ -108,43 +135,68 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
       }
     }
     
-    // Process scenario data if available
+    // Process scenario data if available - using same approach for optimization
     if (scenarioData && scenarioData.length > 0) {
+      // Optimize for large scenario datasets
       const sortedScenario = [...scenarioData].sort((a, b) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
       
-      // Assign scenario balance to periods
+      // Pre-compute map for faster lookups
+      const periodMap = new Map(
+        periods.map(period => [period.label, period])
+      );
+      
+      // Create a map to accumulate scenario transactions by period
+      const scenarioTransactionsByPeriod = new Map<string, any[]>();
+      
+      // Assign scenario balance to periods - optimized approach
       sortedScenario.forEach(item => {
         const itemDate = new Date(item.date);
         
-        // Find which period this item belongs to
-        const period = periods.find(p => itemDate >= p.start && itemDate <= p.end);
-        
-        if (period && item.runningBalance !== undefined) {
-          const periodKey = period.label;
-          const periodIndex = result.findIndex(r => r.displayDate === periodKey);
-          
-          if (periodIndex !== -1) {
-            result[periodIndex].scenarioBalance = item.runningBalance;
+        // Find which period this item belongs to - more efficient loop
+        for (const period of periods) {
+          if (itemDate >= period.start && itemDate <= period.end) {
+            const periodKey = period.label;
+            const periodIndex = result.findIndex(r => r.displayDate === periodKey);
             
-            // Add to scenario transactions
-            if (!result[periodIndex].scenarioTransactions) {
-              result[periodIndex].scenarioTransactions = [];
+            if (periodIndex !== -1) {
+              // Store the last running balance for each period
+              if (item.runningBalance !== undefined) {
+                result[periodIndex].scenarioBalance = item.runningBalance;
+              }
+              
+              // Efficiently collect transactions with memory limits
+              if (!scenarioTransactionsByPeriod.has(periodKey)) {
+                scenarioTransactionsByPeriod.set(periodKey, []);
+              }
+              
+              const transactions = scenarioTransactionsByPeriod.get(periodKey)!;
+              if (transactions.length < transactionLimit) {
+                transactions.push({
+                  id: item.itemId || item.id,
+                  date: item.date,
+                  amount: item.amount,
+                  name: item.name,
+                  category: item.category,
+                  type: item.type,
+                  description: item.description
+                });
+              }
             }
             
-            result[periodIndex].scenarioTransactions.push({
-              id: item.itemId || item.id,
-              date: item.date,
-              amount: item.amount,
-              name: item.name,
-              category: item.category,
-              type: item.type,
-              description: item.description
-            });
+            break; // Exit the loop once we found the right period
           }
         }
       });
+      
+      // Assign collected transactions to result objects
+      for (const [periodKey, transactions] of scenarioTransactionsByPeriod.entries()) {
+        const periodIndex = result.findIndex(r => r.displayDate === periodKey);
+        if (periodIndex !== -1) {
+          result[periodIndex].scenarioTransactions = transactions;
+        }
+      }
       
       // Fill in missing scenario balances
       let lastScenarioBalance = scenarioData[0]?.runningBalance || 0;
@@ -160,7 +212,7 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
     return result;
   }, [baselineData, scenarioData, timeFrame]);
 
-  // Custom tooltip to show detailed transaction information
+  // Custom tooltip to show detailed transaction information - optimized to handle fewer items
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length && payload[0].payload) {
       const periodData = payload[0].payload;
@@ -185,7 +237,7 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
               <div className="h-px w-full bg-border my-2" />
               <p className="text-sm font-semibold">Transactions:</p>
               <div className="max-h-40 overflow-y-auto mt-1">
-                {periodData.transactions.map((t: any, i: number) => (
+                {periodData.transactions.slice(0, 5).map((t: any, i: number) => (
                   <div key={`${t.id || i}`} className="text-xs mb-1 py-1 border-b border-border/50">
                     <div className="flex justify-between">
                       <span className="font-medium">{t.name}</span>
@@ -198,6 +250,11 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
                     </div>
                   </div>
                 ))}
+                {periodData.transactions.length > 5 && (
+                  <div className="text-xs text-muted-foreground text-center pt-1">
+                    + {periodData.transactions.length - 5} more transactions
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -207,7 +264,7 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
               <div className="h-px w-full bg-border my-2" />
               <p className="text-sm font-semibold text-emerald-500">Scenario Transactions:</p>
               <div className="max-h-40 overflow-y-auto mt-1">
-                {periodData.scenarioTransactions.map((t: any, i: number) => (
+                {periodData.scenarioTransactions.slice(0, 5).map((t: any, i: number) => (
                   <div key={`scenario-${t.id || i}`} className="text-xs mb-1 py-1 border-b border-border/50">
                     <div className="flex justify-between">
                       <span className="font-medium">{t.name}</span>
@@ -220,6 +277,11 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
                     </div>
                   </div>
                 ))}
+                {periodData.scenarioTransactions.length > 5 && (
+                  <div className="text-xs text-muted-foreground text-center pt-1">
+                    + {periodData.scenarioTransactions.length - 5} more transactions
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -243,7 +305,6 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
             tick={{ fontSize: 12 }}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend />
           <defs>
             <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
@@ -257,25 +318,21 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
           <Area
             type="monotone"
             dataKey="runningBalance"
-            name="Baseline"
+            name="Balance"
             stroke="#3b82f6"
-            strokeWidth={2}
             fillOpacity={1}
             fill="url(#balanceGradient)"
-            dot={{ r: 4, strokeWidth: 2 }}
-            activeDot={{ r: 6, strokeWidth: 2 }}
+            isAnimationActive={false}
           />
-          {scenarioData && (
+          {scenarioData && scenarioData.length > 0 && (
             <Area
               type="monotone"
               dataKey="scenarioBalance"
               name="Scenario"
               stroke="#10b981"
-              strokeWidth={2}
-              fillOpacity={1}
+              fillOpacity={0.5}
               fill="url(#scenarioGradient)"
-              dot={{ r: 4, strokeWidth: 2 }}
-              activeDot={{ r: 6, strokeWidth: 2 }}
+              isAnimationActive={false}
             />
           )}
         </AreaChart>

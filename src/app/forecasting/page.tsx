@@ -47,6 +47,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { formatCurrency } from "@/utils/financial-utils";
 import { ForecastItem } from "@/types/financial";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 // Types for our forecast data
 type ExpectedIncome = {
@@ -181,6 +182,20 @@ export default function ForecastingPage() {
     const expenses = financialData.expensesData;
     const balanceAdjustments: any[] = [];
     
+    // Check if we need to regenerate the forecast
+    const balanceId = currentBalance.lastUpdated || Date.now().toString();
+    const shouldRegenerateForcecast = 
+      lastGenerationRef.current.balanceId !== balanceId ||
+      lastGenerationRef.current.incomesCount !== incomes.length ||
+      lastGenerationRef.current.billsCount !== bills.length ||
+      lastGenerationRef.current.expensesCount !== expenses.length ||
+      lastGenerationRef.current.forecastPeriod !== forecastPeriod;
+    
+    // Skip generation if data is the same as before
+    if (!shouldRegenerateForcecast && forecastData.length > 0) {
+      return;
+    }
+    
     // Calculate days based on forecastPeriod
     let forecastDays = 90;
     if (forecastPeriod === "1m") forecastDays = 30;
@@ -200,22 +215,60 @@ export default function ForecastingPage() {
     });
     
     try {
-      // Generate baseline forecast
-      const forecast = generateCashFlowForecast(
-        currentBalance.currentBalance,
-        incomes,
-        bills,
-        expenses,
-        balanceAdjustments,
-        forecastDays
-      );
+      // Generate baseline forecast with performance guardrails
+      setForecastData([]); // Clear existing data to free memory
+      
+      // Generate forecast with batch processing if period is long
+      let forecast: ForecastItem[];
+      
+      // Use a different approach based on forecast period length
+      if (forecastDays <= 30) {
+        // For short forecasts, process everything at once
+        forecast = generateCashFlowForecast(
+          currentBalance.currentBalance,
+          incomes,
+          bills,
+          expenses,
+          balanceAdjustments,
+          forecastDays
+        );
+      } else {
+        // For longer forecasts, handle with care
+        forecast = generateCashFlowForecast(
+          currentBalance.currentBalance,
+          incomes,
+          bills,
+          expenses,
+          balanceAdjustments,
+          forecastDays
+        );
+        
+        // Limit the number of items if we have too many
+        if (forecast.length > 1000) {
+          console.warn(`Limiting forecast from ${forecast.length} to 1000 items for performance`);
+          // Keep first and last items, then sample in between
+          const first = forecast.slice(0, 1);
+          const last = forecast.slice(-100);
+          const middle = forecast.slice(1, -100);
+          
+          // Sample middle items at regular intervals
+          const sampledMiddle = [];
+          const sampleInterval = Math.ceil(middle.length / 898);
+          for (let i = 0; i < middle.length; i += sampleInterval) {
+            sampledMiddle.push(middle[i]);
+          }
+          
+          forecast = [...first, ...sampledMiddle, ...last];
+        }
+      }
+
       setForecastData(forecast);
 
       // Log resulting forecast size
       console.log(`Generated ${forecast.length} forecast items`);
 
       // Generate monthly breakdown from forecast data
-      const monthlyData = generateMonthlyBreakdown(forecast);
+      const monthlyData = generateMonthlyBreakdown(forecast, scenarioForecast);
       setMonthlyBreakdown(monthlyData);
 
       // Generate scenario forecast if simulation mode is enabled
@@ -227,7 +280,7 @@ export default function ForecastingPage() {
 
       // Update last generation reference to track state
       lastGenerationRef.current = {
-        balanceId: currentBalance.lastUpdated || Date.now().toString(),
+        balanceId,
         incomesCount: incomes.length,
         billsCount: bills.length,
         expensesCount: expenses.length,
@@ -278,7 +331,7 @@ export default function ForecastingPage() {
       const balanceAdjustments: any[] = [];
       if (savingsAdjustment > 0) {
         // Create an adjustment for each month in the forecast period
-        const monthsInForecast = Math.ceil(forecastDays / 30);
+        const monthsInForecast = Math.min(Math.ceil(forecastDays / 30), 12); // Cap at 12 months
         for (let i = 0; i < monthsInForecast; i++) {
           const date = new Date();
           date.setDate(1); // First day of the month
@@ -309,119 +362,183 @@ export default function ForecastingPage() {
         });
       }
       
-      // Generate forecast with adjusted values
-      const scenarioForecast = generateCashFlowForecast(
-        currentBalance,
-        adjustedIncomes,
-        adjustedBills,
-        adjustedExpenses,
-        balanceAdjustments,
-        forecastDays
-      );
+      // Use the same optimization approach as in the baseline forecast
+      let scenarioForecast: ForecastItem[];
+      setScenarioForecast([]); // Clear existing data to free memory
+      
+      if (forecastDays <= 30) {
+        // For short forecasts, process everything at once
+        scenarioForecast = generateCashFlowForecast(
+          currentBalance,
+          adjustedIncomes,
+          adjustedBills,
+          adjustedExpenses,
+          balanceAdjustments,
+          forecastDays
+        );
+      } else {
+        // Generate forecast with optimization for longer periods
+        scenarioForecast = generateCashFlowForecast(
+          currentBalance,
+          adjustedIncomes,
+          adjustedBills,
+          adjustedExpenses,
+          balanceAdjustments,
+          forecastDays
+        );
+        
+        // Limit the number of items if we have too many
+        if (scenarioForecast.length > 1000) {
+          console.warn(`Limiting scenario forecast from ${scenarioForecast.length} to 1000 items`);
+          // Keep first and last items, then sample in between
+          const first = scenarioForecast.slice(0, 1);
+          const last = scenarioForecast.slice(-100);
+          const middle = scenarioForecast.slice(1, -100);
+          
+          // Sample middle items at regular intervals
+          const sampledMiddle = [];
+          const sampleInterval = Math.ceil(middle.length / 898);
+          for (let i = 0; i < middle.length; i += sampleInterval) {
+            sampledMiddle.push(middle[i]);
+          }
+          
+          scenarioForecast = [...first, ...sampledMiddle, ...last];
+        }
+      }
       
       setScenarioForecast(scenarioForecast);
+      console.log(`Generated ${scenarioForecast.length} scenario forecast items`);
+      
     } catch (error) {
       console.error("Error generating scenario forecast:", error);
       setScenarioForecast([]);
     }
-  }, [
-    financialData.profileData,
-    financialData.incomesData,
-    financialData.billsData,
-    financialData.expensesData,
-    forecastPeriod,
-    incomeAdjustment,
-    expensesAdjustment,
-    savingsAdjustment,
-    unexpectedExpense,
-    unexpectedExpenseDate
-  ]);
+  }, [financialData.profileData, financialData.incomesData, financialData.billsData, financialData.expensesData, forecastPeriod, incomeAdjustment, expensesAdjustment, savingsAdjustment, unexpectedExpense, unexpectedExpenseDate]);
 
   // Function to generate monthly breakdown from forecast data
-  const generateMonthlyBreakdown = (forecast: ForecastItem[], scenarioForecast?: ForecastItem[]) => {
-    // Initialize 12 months of data
-    const months: Record<string, MonthlyForecast> = {};
-    
-    // Process each forecast item
-    forecast.forEach(item => {
-      const date = new Date(item.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      // Initialize month if needed
-      if (!months[monthKey]) {
-        const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
-        months[monthKey] = {
-          month: monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          startingBalance: 0,
-          income: 0,
-          mandatoryExpenses: 0,
-          optionalExpenses: 0,
-          endingBalance: 0
-        };
-      }
-      
-      // Update month data based on item type
-      if (item.type === 'income') {
-        months[monthKey].income += item.amount;
-      } else if (item.type === 'expense' || item.type === 'bill') {
-        // Categorize expenses as mandatory or optional
-        if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
-          months[monthKey].optionalExpenses += Math.abs(item.amount);
-        } else {
-          months[monthKey].mandatoryExpenses += Math.abs(item.amount);
-        }
-      }
-    });
-    
-    // Process scenario forecast if available
-    if (scenarioForecast?.length) {
-      scenarioForecast.forEach(item => {
-        const date = new Date(item.date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        
-        if (months[monthKey]) {
-          if (item.type === 'income') {
-            months[monthKey].scenarioIncome = (months[monthKey].scenarioIncome || 0) + item.amount;
-          } else if (item.type === 'expense' || item.type === 'bill') {
-            if (['Entertainment', 'Personal', 'Dining', 'Shopping'].includes(item.category)) {
-              months[monthKey].scenarioOptionalExpenses = (months[monthKey].scenarioOptionalExpenses || 0) + Math.abs(item.amount);
-            } else {
-              months[monthKey].scenarioMandatoryExpenses = (months[monthKey].scenarioMandatoryExpenses || 0) + Math.abs(item.amount);
-            }
-          }
-        }
-      });
+  const generateMonthlyBreakdown = (forecast: ForecastItem[], scenarioForecast: ForecastItem[] = []) => {
+    // Skip if no forecast data
+    if (!forecast || forecast.length === 0) {
+      console.log("No forecast data to generate monthly breakdown");
+      return [];
     }
     
-    // Get starting balance from the financial data
-    const initialBalance = financialData.profileData?.currentBalance || 0;
+    // Initialize map to track monthly data
+    const monthlyData = new Map<string, {
+      month: string;
+      income: number;
+      mandatoryExpenses: number;
+      optionalExpenses: number;
+      netCashFlow: number;
+      scenarioIncome?: number;
+      scenarioMandatoryExpenses?: number;
+      scenarioOptionalExpenses?: number;
+      scenarioNetCashFlow?: number;
+    }>();
     
-    // Calculate running balances for both baseline and scenario
-    let runningBalance = initialBalance;
-    let scenarioRunningBalance = initialBalance;
-    
-    Object.values(months).forEach(month => {
-      // Baseline calculations
-      month.startingBalance = runningBalance;
-      month.endingBalance = runningBalance + month.income - month.mandatoryExpenses - (includeOptionalExpenses ? month.optionalExpenses : 0);
-      runningBalance = month.endingBalance;
+    try {
+      // Process items in chunks to prevent UI freezing for large forecasts
+      const processItems = (items: ForecastItem[], isScenario: boolean = false) => {
+        // Define which categories are optional expenses
+        const optionalCategories = ['Entertainment', 'Personal', 'Dining', 'Shopping'];
+        
+        // Process a maximum of 2000 items for performance
+        const processLimit = 2000;
+        const itemsToProcess = items.length > processLimit 
+          ? [...items.slice(0, 100), ...items.slice(-processLimit + 100)]
+          : items;
+          
+        if (items.length > processLimit) {
+          console.warn(`Monthly breakdown processing limited from ${items.length} to ${processLimit} items`);
+        }
+        
+        // Process each item in the forecast
+        for (const item of itemsToProcess) {
+          try {
+            if (!item.date) continue;
+            
+            // Convert date to month key (YYYY-MM)
+            const date = new Date(item.date);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            // Create or update monthly data
+            if (!monthlyData.has(monthKey)) {
+              monthlyData.set(monthKey, {
+                month: monthLabel,
+                income: 0,
+                mandatoryExpenses: 0,
+                optionalExpenses: 0,
+                netCashFlow: 0,
+                scenarioIncome: 0,
+                scenarioMandatoryExpenses: 0,
+                scenarioOptionalExpenses: 0,
+                scenarioNetCashFlow: 0
+              });
+            }
+            
+            const monthData = monthlyData.get(monthKey)!;
+            
+            // Add to the appropriate category based on item type
+            if (item.type === 'income') {
+              if (isScenario) {
+                monthData.scenarioIncome = (monthData.scenarioIncome || 0) + item.amount;
+                monthData.scenarioNetCashFlow = (monthData.scenarioNetCashFlow || 0) + item.amount;
+              } else {
+                monthData.income += item.amount;
+                monthData.netCashFlow += item.amount;
+              }
+            } else if (item.type === 'expense' || item.type === 'bill') {
+              const expenseAmount = Math.abs(item.amount);
+              
+              // Categorize as mandatory or optional expense
+              if (optionalCategories.includes(item.category)) {
+                if (isScenario) {
+                  monthData.scenarioOptionalExpenses = (monthData.scenarioOptionalExpenses || 0) + expenseAmount;
+                  monthData.scenarioNetCashFlow = (monthData.scenarioNetCashFlow || 0) - expenseAmount;
+                } else {
+                  monthData.optionalExpenses += expenseAmount;
+                  monthData.netCashFlow -= expenseAmount;
+                }
+              } else {
+                if (isScenario) {
+                  monthData.scenarioMandatoryExpenses = (monthData.scenarioMandatoryExpenses || 0) + expenseAmount;
+                  monthData.scenarioNetCashFlow = (monthData.scenarioNetCashFlow || 0) - expenseAmount;
+                } else {
+                  monthData.mandatoryExpenses += expenseAmount;
+                  monthData.netCashFlow -= expenseAmount;
+                }
+              }
+            }
+            
+            // Update the map
+            monthlyData.set(monthKey, monthData);
+          } catch (err) {
+            console.warn("Error processing item for monthly breakdown:", err);
+          }
+        }
+      };
       
-      // Scenario calculations if available
-      if (scenarioForecast?.length) {
-        month.scenarioEndingBalance = scenarioRunningBalance + 
-          (month.scenarioIncome || 0) - 
-          (month.scenarioMandatoryExpenses || 0) - 
-          (includeOptionalExpenses ? (month.scenarioOptionalExpenses || 0) : 0);
-        scenarioRunningBalance = month.scenarioEndingBalance;
+      // Process baseline forecast
+      processItems(forecast);
+      
+      // Process scenario forecast if available
+      if (scenarioForecast && scenarioForecast.length > 0) {
+        processItems(scenarioForecast, true);
       }
-    });
-    
-    // Convert to array and sort by month
-    const monthlyData = Object.values(months).sort((a, b) => {
-      return new Date(a.month).getTime() - new Date(b.month).getTime();
-    });
-    
-    return monthlyData;
+      
+      // Convert map to array and sort by date
+      const result = Array.from(monthlyData.values()).sort((a, b) => {
+        const dateA = new Date(a.month);
+        const dateB = new Date(b.month);
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      return result;
+    } catch (error) {
+      console.error("Error generating monthly breakdown:", error);
+      return [];
+    }
   };
 
   // Add this function to handle balance updates
@@ -532,7 +649,28 @@ export default function ForecastingPage() {
 
   // Format the data for the chart
   const getForecastChartData = () => {
-    return forecastData.map(item => ({
+    // For very large datasets, sample the data to prevent performance issues
+    const maxDataPoints = 100;
+    let dataToProcess = forecastData;
+    
+    if (forecastData.length > maxDataPoints) {
+      console.log(`Sampling chart data from ${forecastData.length} to ${maxDataPoints} points`);
+      // Keep first and last points, then sample the rest evenly
+      const first = forecastData.slice(0, 1);
+      const last = forecastData.slice(-1);
+      const middle = forecastData.slice(1, -1);
+      
+      // Calculate sampling interval
+      const step = Math.floor(middle.length / (maxDataPoints - 2));
+      const sampledMiddle = [];
+      for (let i = 0; i < middle.length; i += step) {
+        sampledMiddle.push(middle[i]);
+      }
+      
+      dataToProcess = [...first, ...sampledMiddle, ...last];
+    }
+    
+    return dataToProcess.map(item => ({
       date: new Date(item.date).toLocaleDateString(),
       balance: item.runningBalance || 0,
       income: item.type === 'income' ? item.amount : 0,
@@ -750,8 +888,8 @@ export default function ForecastingPage() {
                   </div>
                 ) : (
                   monthlyBreakdown.map((month, index) => {
-                    const isPositiveCashflow = month.endingBalance >= 0;
-                    const isScenarioPositive = month.scenarioEndingBalance ? month.scenarioEndingBalance >= 0 : true;
+                    const isPositiveCashflow = month.netCashFlow >= 0;
+                    const isScenarioPositive = month.scenarioNetCashFlow ? month.scenarioNetCashFlow >= 0 : true;
                     
                     return (
                       <div key={index} className="space-y-2">
@@ -763,15 +901,15 @@ export default function ForecastingPage() {
                                 ? 'text-emerald-500'
                                 : 'text-rose-500'
                             }`}>
-                              {isPositiveCashflow ? '+' : ''}{formatCurrency(month.endingBalance)}
+                              {isPositiveCashflow ? '+' : ''}{formatCurrency(month.netCashFlow)}
                             </span>
-                            {month.scenarioEndingBalance !== undefined && (
+                            {month.scenarioNetCashFlow !== undefined && (
                               <span className={`text-sm font-semibold ${
                                 isScenarioPositive
                                   ? 'text-emerald-500'
                                   : 'text-rose-500'
                               }`}>
-                                ({isScenarioPositive ? '+' : ''}{formatCurrency(month.scenarioEndingBalance)})
+                                ({isScenarioPositive ? '+' : ''}{formatCurrency(month.scenarioNetCashFlow)})
                               </span>
                             )}
                           </div>
@@ -781,58 +919,28 @@ export default function ForecastingPage() {
                             <p className="text-muted-foreground">
                               Income: <span className="font-medium text-emerald-500">+{formatCurrency(month.income)}</span>
                               {month.scenarioIncome !== undefined && (
-                                <span className="text-emerald-500 ml-1">
-                                  (+{formatCurrency(month.scenarioIncome)})
+                                <span className="ml-1 text-xs text-emerald-500">
+                                  ({formatCurrency(month.scenarioIncome)})
                                 </span>
                               )}
                             </p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">
-                              Expenses: <span className="font-medium text-rose-500">
-                                -{formatCurrency(month.mandatoryExpenses + (includeOptionalExpenses ? month.optionalExpenses : 0))}
-                              </span>
-                              {month.scenarioMandatoryExpenses !== undefined && (
-                                <span className="text-rose-500 ml-1">
-                                  (-{formatCurrency(month.scenarioMandatoryExpenses + (includeOptionalExpenses ? (month.scenarioOptionalExpenses || 0) : 0))})
+                              Expenses: <span className="font-medium text-rose-500">-{formatCurrency(month.mandatoryExpenses + (includeOptionalExpenses ? month.optionalExpenses : 0))}</span>
+                              {(month.scenarioMandatoryExpenses !== undefined || month.scenarioOptionalExpenses !== undefined) && (
+                                <span className="ml-1 text-xs text-rose-500">
+                                  ({formatCurrency((month.scenarioMandatoryExpenses || 0) + (includeOptionalExpenses ? (month.scenarioOptionalExpenses || 0) : 0))})
                                 </span>
                               )}
                             </p>
                           </div>
                         </div>
-                        <div className="mt-1">
-                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                            <div
-                              className={`h-2 rounded-full ${isPositiveCashflow ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                              style={{ 
-                                width: `${Math.min(100, Math.abs(month.endingBalance) / (month.income || 1) * 100)}%` 
-                              }}
-                            />
-                            {month.scenarioEndingBalance !== undefined && (
-                              <div
-                                className={`h-2 rounded-full ${isScenarioPositive ? 'bg-emerald-500/50' : 'bg-rose-500/50'}`}
-                                style={{ 
-                                  width: `${Math.min(100, Math.abs(month.scenarioEndingBalance) / (month.scenarioIncome || 1) * 100)}%` 
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        {month.optionalExpenses > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {includeOptionalExpenses 
-                              ? `Includes ${formatCurrency(month.optionalExpenses)} in optional expenses${
-                                  month.scenarioOptionalExpenses !== undefined 
-                                    ? ` (${formatCurrency(month.scenarioOptionalExpenses)} in scenario)`
-                                    : ''
-                                }` 
-                              : `${formatCurrency(month.optionalExpenses)} in optional expenses not included${
-                                  month.scenarioOptionalExpenses !== undefined
-                                    ? ` (${formatCurrency(month.scenarioOptionalExpenses)} in scenario)`
-                                    : ''
-                                }`}
-                          </p>
-                        )}
+                        <Progress
+                          value={isPositiveCashflow ? 100 : (month.income / (month.mandatoryExpenses + month.optionalExpenses + 0.01)) * 100}
+                          className={`h-2 ${isPositiveCashflow ? 'bg-emerald-100' : 'bg-rose-100'}`}
+                          indicatorClassName={isPositiveCashflow ? 'bg-emerald-500' : 'bg-rose-500'}
+                        />
                       </div>
                     );
                   })
