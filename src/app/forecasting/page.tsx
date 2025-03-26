@@ -80,15 +80,14 @@ type OptionalExpense = {
 
 type MonthlyForecast = {
   month: string;
-  startingBalance: number;
   income: number;
   mandatoryExpenses: number;
   optionalExpenses: number;
-  endingBalance: number;
+  netCashFlow: number;
   scenarioIncome?: number;
   scenarioMandatoryExpenses?: number;
   scenarioOptionalExpenses?: number;
-  scenarioEndingBalance?: number;
+  scenarioNetCashFlow?: number;
 };
 
 // Add these types near the top with other type definitions
