@@ -127,6 +127,8 @@ export const BILL_CATEGORIES = [
   'Debt',
   'Services',
   'Taxes',
+  'Car Payment',
+  'Medical Bills',
   'Other'
 ];
 
