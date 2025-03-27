@@ -848,7 +848,7 @@ export default function ForecastingPage() {
                 <div className="text-2xl font-bold">${totals.projectedIncome}</div>
                 {scenarioForecast.length > 0 && (
                   <div className="text-sm text-emerald-500">
-                    ${(parseFloat(totals.projectedIncome) * (1 + incomeAdjustment / 100)).toFixed(2)} (Scenario)
+                    ${(totals.projectedIncome * (1 + incomeAdjustment / 100)).toFixed(2)} (Scenario)
                   </div>
                 )}
               </div>
@@ -865,7 +865,7 @@ export default function ForecastingPage() {
                 <div className="text-2xl font-bold">${totals.projectedExpenses}</div>
                 {scenarioForecast.length > 0 && (
                   <div className="text-sm text-rose-500">
-                    ${(parseFloat(totals.projectedExpenses) * (1 + expensesAdjustment / 100)).toFixed(2)} (Scenario)
+                    ${(totals.projectedExpenses * (1 + expensesAdjustment / 100)).toFixed(2)} (Scenario)
                   </div>
                 )}
               </div>
