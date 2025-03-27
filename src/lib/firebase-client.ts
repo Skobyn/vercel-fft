@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth, User, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
+import { getFunctions, Functions, connectFunctionsEmulator } from 'firebase/functions';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -18,6 +19,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let db: Firestore;
 let auth: Auth;
+let functions: Functions;
 let analytics: Analytics | null = null;
 
 // Initialize Firebase
@@ -41,6 +43,18 @@ if (typeof window !== 'undefined') {
       .then(() => console.log("Firebase persistence set successfully"))
       .catch((error) => console.error("Error setting persistence:", error));
     
+    // Initialize Functions
+    functions = getFunctions(app);
+    
+    // Connect to Functions emulator if in development
+    if (process.env.NODE_ENV === 'development') {
+      const useEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+      if (useEmulator) {
+        connectFunctionsEmulator(functions, 'localhost', 5001);
+        console.log("Connected to Firebase Functions emulator");
+      }
+    }
+    
     // Initialize Analytics when possible
     isSupported()
       .then(supported => {
@@ -63,9 +77,11 @@ if (typeof window !== 'undefined') {
   db = {} as Firestore;
   //@ts-ignore - these are placeholders for SSR
   auth = {} as Auth;
+  //@ts-ignore - these are placeholders for SSR
+  functions = {} as Functions;
 }
 
-export { db, auth, analytics };
+export { db, auth, analytics, functions };
 
 // Helper functions for common database operations
 export const getCurrentUser = async (): Promise<User | null> => {

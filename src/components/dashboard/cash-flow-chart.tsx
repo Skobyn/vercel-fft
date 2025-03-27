@@ -21,9 +21,10 @@ import {
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFinancialData } from "@/hooks/use-financial-data";
-import { ForecastItem, BalanceAdjustment } from "@/types/financial";
-import { generateCashFlowForecast, formatCurrency, formatDate } from "@/utils/financial-utils";
+import { ForecastItem } from "@/types/financial";
+import { formatCurrency, formatDate } from "@/utils/financial-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getForecast } from "@/services/forecast-service";
 
 interface CashFlowChartProps {
   days?: number;
@@ -104,36 +105,14 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     setIsGeneratingForecast(true);
     setError(null);
     
-    // Use a longer timeout for larger datasets
-    const days = parseInt(timeframe);
-    const isLargeDataset = days > 30 || incomesArray.length > 10 || billsArray.length > 20;
-    const timeoutDelay = isLargeDataset ? 200 : 50; // Allow more time for larger datasets
-    
-    timeoutRef.current = setTimeout(() => {
+    // Use BigQuery for forecast instead of client-side calculation
+    const fetchForecast = async () => {
       try {
-        // Limit the number of items to process for large datasets to prevent browser freezing
-        const processableIncomes = isLargeDataset && incomesArray.length > 10 ? 
-          incomesArray.slice(0, 10) : incomesArray;
-        const processableBills = isLargeDataset && billsArray.length > 20 ? 
-          billsArray.slice(0, 20) : billsArray;
+        const days = parseInt(timeframe);
+        console.log(`Fetching ${days}-day forecast from BigQuery`);
         
-        // Log what we're working with
-        console.log(`Generating forecast with ${processableIncomes.length} incomes and ${processableBills.length} bills`);
-        
-        // Double-check for valid data before generating forecast
-        if (typeof currentBalance !== 'number' || isNaN(currentBalance)) {
-          throw new Error("Invalid current balance for forecast");
-        }
-        
-        // Call the forecast generation utility
-        const forecast = generateCashFlowForecast(
-          currentBalance,
-          processableIncomes,
-          processableBills,
-          [], // No expenses for now
-          [], // No balance adjustments for now
-          days
-        );
+        // Call our forecast service that uses BigQuery
+        const forecast = await getForecast(days);
         
         // Check if we got a valid forecast
         if (!Array.isArray(forecast) || forecast.length === 0) {
@@ -167,9 +146,22 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
       } finally {
         setIsGeneratingForecast(false);
         setChartReady(true);
+      }
+    };
+    
+    // Add a slight delay to prevent too many requests during rapid changes
+    timeoutRef.current = setTimeout(() => {
+      fetchForecast();
+      timeoutRef.current = null;
+    }, 300);
+    
+    // Cleanup function
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-    }, timeoutDelay); // Small delay to allow rendering
+    };
   }, [financialData, timeframe]);
 
   const handleTimeframeChange = (value: string) => {
