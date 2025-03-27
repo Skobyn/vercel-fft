@@ -10,8 +10,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Trash2, Download, Upload, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { exportToCSV, parseCSV } from "@/utils/financial-utils";
-import { EXPENSE_CATEGORIES } from "@/types/financial";
+import { exportToCSV, parseCSV, normalizeAmount, matchCategory, normalizeFrequency } from "@/utils/financial-utils";
+import { EXPENSE_CATEGORIES, BILL_CATEGORIES } from "@/types/financial";
 import { toast } from "sonner";
 
 // Expense categories
@@ -256,14 +256,48 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
             return;
           }
           
-          // Set the imported data as rows
-          setRows(csvData.map(row => ({
-            ...createEmptyRow(),
-            ...row,
-            amount: row.amount.toString()
-          })));
+          // Get valid categories based on type
+          const validCategories = type === "bills" ? BILL_CATEGORIES : EXPENSE_CATEGORIES;
           
-          toast.success(`Imported ${csvData.length} ${type}`);
+          // Process and normalize the imported data
+          const normalizedData = csvData.map(row => {
+            // Normalize amount (handle currency symbols, commas, etc.)
+            const normalizedAmount = normalizeAmount(row.amount);
+            
+            // Match category to valid categories
+            const normalizedCategory = matchCategory(row.category, validCategories);
+            
+            // Normalize frequency (handle case variations)
+            const normalizedFrequency = normalizeFrequency(row.frequency);
+            
+            // Convert string boolean values to actual booleans
+            const autoPay = typeof row.autoPay === 'string' 
+              ? row.autoPay.toLowerCase() === 'true' || row.autoPay.toLowerCase() === 'yes'
+              : Boolean(row.autoPay);
+              
+            const isPaid = typeof row.isPaid === 'string'
+              ? row.isPaid.toLowerCase() === 'true' || row.isPaid.toLowerCase() === 'yes'
+              : Boolean(row.isPaid);
+            
+            // Create normalized row with default empty values for missing fields
+            return {
+              ...createEmptyRow(),
+              ...row,
+              amount: isNaN(normalizedAmount) ? "" : normalizedAmount.toString(),
+              category: normalizedCategory.toLowerCase().replace(/\s+/g, '-'),
+              frequency: normalizedFrequency,
+              autoPay,
+              isPaid,
+              // Ensure date formats are valid or default to today
+              dueDate: type === "bills" && row.dueDate ? row.dueDate : format(new Date(), "yyyy-MM-dd"),
+              date: type === "expenses" && row.date ? row.date : format(new Date(), "yyyy-MM-dd"),
+            };
+          });
+          
+          // Set the normalized data as rows
+          setRows(normalizedData);
+          
+          toast.success(`Imported ${normalizedData.length} ${type}`);
         } catch (error) {
           console.error("Error parsing CSV:", error);
           toast.error("Failed to parse CSV file. Please check the format.");

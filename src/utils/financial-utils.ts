@@ -666,4 +666,105 @@ function parseCSVLine(line: string): string[] {
   result.push(currentValue);
   
   return result;
+}
+
+/**
+ * Normalizes a currency amount string to a number
+ * Handles dollar signs, commas, spaces, etc.
+ * @param amount The amount string to normalize
+ * @returns A normalized number or NaN if invalid
+ */
+export function normalizeAmount(amount: string): number {
+  if (!amount) return NaN;
+  
+  // Remove currency symbols, spaces, and other non-numeric characters except decimal points
+  const cleanedAmount = amount.replace(/[^0-9.-]/g, '');
+  
+  // Parse the cleaned string to a number
+  return parseFloat(cleanedAmount);
+}
+
+/**
+ * Matches a category string to the closest valid category
+ * Case-insensitive and handles singular/plural variations
+ * @param categoryInput User input category
+ * @param validCategories Array of valid categories
+ * @returns The matched valid category or the first category if no match
+ */
+export function matchCategory(categoryInput: string, validCategories: string[]): string {
+  if (!categoryInput || !validCategories.length) return validCategories[0] || '';
+  
+  // Normalize the input (lowercase, trim)
+  const normalizedInput = categoryInput.toLowerCase().trim();
+  
+  // First try exact match (case insensitive)
+  const exactMatch = validCategories.find(
+    category => category.toLowerCase() === normalizedInput
+  );
+  if (exactMatch) return exactMatch;
+  
+  // Try singular/plural variations
+  // If input ends with 's', try without it, or vice versa
+  const singularPlural = normalizedInput.endsWith('s') 
+    ? normalizedInput.slice(0, -1) 
+    : normalizedInput + 's';
+  
+  const singularPluralMatch = validCategories.find(
+    category => category.toLowerCase() === singularPlural
+  );
+  if (singularPluralMatch) return singularPluralMatch;
+  
+  // Try fuzzy match - category that contains the input
+  const fuzzyMatch = validCategories.find(
+    category => category.toLowerCase().includes(normalizedInput) || 
+                normalizedInput.includes(category.toLowerCase())
+  );
+  if (fuzzyMatch) return fuzzyMatch;
+  
+  // Default to the first category if no match
+  return validCategories[0];
+}
+
+/**
+ * Normalizes a frequency string to a valid frequency value
+ * Handles case variations and common abbreviations
+ * @param frequency The frequency string to normalize
+ * @returns A normalized valid frequency value
+ */
+export function normalizeFrequency(frequency: string): string {
+  if (!frequency) return 'once';
+  
+  const normalizedInput = frequency.toLowerCase().trim();
+  
+  // Direct matches
+  const frequencyMap: Record<string, string> = {
+    'once': 'once',
+    'daily': 'daily',
+    'weekly': 'weekly',
+    'biweekly': 'biweekly',
+    'bi-weekly': 'biweekly',
+    'bi weekly': 'biweekly',
+    'monthly': 'monthly',
+    'quarterly': 'quarterly',
+    'semiannually': 'semiannually',
+    'semi-annually': 'semiannually',
+    'semi annually': 'semiannually',
+    'annually': 'annually',
+    'yearly': 'annually'
+  };
+  
+  // Check for direct match
+  if (frequencyMap[normalizedInput]) {
+    return frequencyMap[normalizedInput];
+  }
+  
+  // Check for partial matches
+  for (const [key, value] of Object.entries(frequencyMap)) {
+    if (normalizedInput.includes(key) || key.includes(normalizedInput)) {
+      return value;
+    }
+  }
+  
+  // Default to 'once' if no match
+  return 'once';
 } 
