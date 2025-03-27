@@ -22,9 +22,8 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFinancialData } from "@/hooks/use-financial-data";
 import { ForecastItem } from "@/types/financial";
-import { formatCurrency, formatDate } from "@/utils/financial-utils";
+import { formatCurrency, formatDate, generateCashFlowForecast } from "@/utils/financial-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getForecast } from "@/services/forecast-service";
 
 interface CashFlowChartProps {
   days?: number;
@@ -105,19 +104,23 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     setIsGeneratingForecast(true);
     setError(null);
     
-    // Use BigQuery for forecast instead of client-side calculation
-    const fetchForecast = async () => {
+    // Use client-side forecast generation for dashboard
+    // Fixed at 14 days max to avoid performance issues
+    const generateLocalForecast = () => {
       try {
         const days = parseInt(timeframe);
-        console.log(`Fetching ${days}-day forecast from BigQuery`);
+        // Enforce 14-day limit for the dashboard
+        const safeDays = Math.min(days, 14);
+        console.log(`Generating ${safeDays}-day forecast client-side`);
         
-        // Call our forecast service that uses BigQuery
-        const forecast = await getForecast(days);
-        
-        // Check if we got a valid forecast
-        if (!Array.isArray(forecast) || forecast.length === 0) {
-          throw new Error("Generated forecast is empty or invalid");
-        }
+        const forecast = generateCashFlowForecast(
+          currentBalance,
+          incomesArray,
+          billsArray,
+          financialData.expensesData || [],
+          [], // No balance adjustments
+          safeDays
+        );
         
         // Update the last generation reference
         lastGenerationRef.current = {
@@ -151,7 +154,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     
     // Add a slight delay to prevent too many requests during rapid changes
     timeoutRef.current = setTimeout(() => {
-      fetchForecast();
+      generateLocalForecast();
       timeoutRef.current = null;
     }, 300);
     

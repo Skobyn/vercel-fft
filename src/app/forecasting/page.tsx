@@ -25,7 +25,9 @@ import {
   Check,
   CalendarClock,
   CreditCard,
-  CalendarCheck
+  CalendarCheck,
+  PiggyBank,
+  BarChart
 } from "lucide-react";
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
@@ -48,6 +50,21 @@ import { formatCurrency } from "@/utils/financial-utils";
 import { ForecastItem } from "@/types/financial";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  ReferenceLine,
+  BarChart as RechartsBarChart,
+  Bar,
+  Legend
+} from "recharts";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Types for our forecast data
 type ExpectedIncome = {
@@ -101,6 +118,57 @@ type BalanceEdit = {
 // Add type definition for the forecast period
 type ForecastPeriod = "1m" | "3m" | "6m" | "12m";
 
+// Custom tooltip for the chart
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    // Find the daily events for this date point
+    const dayData = payload[0].payload;
+    
+    return (
+      <div className="bg-background border rounded-md p-3 shadow-md">
+        <p className="font-medium">{label}</p>
+        <p className="text-sm text-muted-foreground">Starting Balance: {formatCurrency(dayData.startingBalance || 0)}</p>
+        <Separator className="my-2" />
+        
+        {dayData.dailyEvents?.incomes?.length > 0 && (
+          <>
+            <p className="text-sm font-medium text-green-500">Income:</p>
+            {dayData.dailyEvents.incomes.map((income: any, i: number) => (
+              <p key={`income-${i}`} className="text-xs">
+                {income.name}: {formatCurrency(income.amount)}
+              </p>
+            ))}
+            <Separator className="my-2" />
+          </>
+        )}
+        
+        {dayData.dailyEvents?.expenses?.length > 0 && (
+          <>
+            <p className="text-sm font-medium text-red-500">Expenses:</p>
+            {dayData.dailyEvents.expenses.map((expense: any, i: number) => (
+              <p key={`expense-${i}`} className="text-xs">
+                {expense.name}: {formatCurrency(Math.abs(expense.amount))}
+              </p>
+            ))}
+            <Separator className="my-2" />
+          </>
+        )}
+        
+        <p className="font-medium">
+          Ending Balance: {formatCurrency(payload[0].value)}
+        </p>
+        
+        {payload.length > 1 && (
+          <p className="font-medium text-purple-500">
+            Scenario Balance: {formatCurrency(payload[1].value)}
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function ForecastingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -115,7 +183,7 @@ export default function ForecastingPage() {
   const [expensesAdjustment, setExpensesAdjustment] = useState(0);
   const [savingsAdjustment, setSavingsAdjustment] = useState(0);
   const [unexpectedExpense, setUnexpectedExpense] = useState(0);
-  const [unexpectedExpenseDate, setUnexpectedExpenseDate] = useState<Date | undefined>(undefined);
+  const [unexpectedIncome, setUnexpectedIncome] = useState(0);
   const [scenarioForecast, setScenarioForecast] = useState<ForecastItem[]>([]);
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [newBalance, setNewBalance] = useState(0);
@@ -173,16 +241,21 @@ export default function ForecastingPage() {
 
   // Generate forecast data
   useEffect(() => {
-    if (!financialData.profileData || !financialData.incomesData || !financialData.billsData || !financialData.expensesData) return;
+    if (financialData.loading) {
+      return;
+    }
+    
+    if (!financialData.profileData || !financialData.incomesData || !financialData.billsData || !financialData.expensesData) {
+      return;
+    }
 
-    const currentBalance = financialData.profileData;
+    const currentBalance = financialData.profileData.currentBalance;
     const incomes = financialData.incomesData;
     const bills = financialData.billsData;
     const expenses = financialData.expensesData;
-    const balanceAdjustments: any[] = [];
     
     // Check if we need to regenerate the forecast
-    const balanceId = currentBalance.lastUpdated || Date.now().toString();
+    const balanceId = financialData.profileData.lastUpdated || Date.now().toString();
     const shouldRegenerateForcecast = 
       lastGenerationRef.current.balanceId !== balanceId ||
       lastGenerationRef.current.incomesCount !== incomes.length ||
@@ -198,20 +271,8 @@ export default function ForecastingPage() {
     // Calculate days based on forecastPeriod
     let forecastDays = 90;
     if (forecastPeriod === "1m") forecastDays = 30;
-    else if (forecastPeriod === "3m") forecastDays = 90;
-    else if (forecastPeriod === "6m") forecastDays = 180;
-    else if (forecastPeriod === "12m") forecastDays = 365;
-
-    // Log recurring items counts for debugging
-    console.log("Forecasting with:", {
-      totalIncomes: incomes.length,
-      recurringIncomes: incomes.filter(i => i.isRecurring).length,
-      totalBills: bills.length,
-      recurringBills: bills.filter(b => b.isRecurring).length,
-      totalExpenses: expenses.length,
-      plannedExpenses: expenses.filter(e => e.isPlanned).length,
-      forecastDays
-    });
+    if (forecastPeriod === "6m") forecastDays = 180;
+    if (forecastPeriod === "12m") forecastDays = 365;
     
     try {
       // Generate baseline forecast with performance guardrails
@@ -224,21 +285,21 @@ export default function ForecastingPage() {
       if (forecastDays <= 30) {
         // For short forecasts, process everything at once
         forecast = generateCashFlowForecast(
-          currentBalance.currentBalance,
+          currentBalance,
           incomes,
           bills,
           expenses,
-          balanceAdjustments,
+          [], // No balance adjustments for now
           forecastDays
         );
       } else {
         // For longer forecasts, handle with care
         forecast = generateCashFlowForecast(
-          currentBalance.currentBalance,
+          currentBalance,
           incomes,
           bills,
           expenses,
-          balanceAdjustments,
+          [], // No balance adjustments for now
           forecastDays
         );
         
@@ -349,15 +410,28 @@ export default function ForecastingPage() {
       }
       
       // Add unexpected expense if specified
-      if (unexpectedExpense > 0 && unexpectedExpenseDate) {
+      if (unexpectedExpense > 0) {
         balanceAdjustments.push({
           id: `unexpected-${Date.now()}`,
-          date: unexpectedExpenseDate.toISOString(),
+          date: new Date().toISOString(),
           amount: -unexpectedExpense,
           category: 'Unexpected',
           name: 'Unexpected Expense',
           type: 'expense',
           description: 'Unexpected Expense'
+        });
+      }
+      
+      // Add unexpected income if specified
+      if (unexpectedIncome > 0) {
+        balanceAdjustments.push({
+          id: `unexpected-income-${Date.now()}`,
+          date: new Date().toISOString(),
+          amount: unexpectedIncome,
+          category: 'Unexpected',
+          name: 'Unexpected Income',
+          type: 'income',
+          description: 'Unexpected Income'
         });
       }
       
@@ -412,7 +486,7 @@ export default function ForecastingPage() {
       console.error("Error generating scenario forecast:", error);
       setScenarioForecast([]);
     }
-  }, [financialData.profileData, financialData.incomesData, financialData.billsData, financialData.expensesData, forecastPeriod, incomeAdjustment, expensesAdjustment, savingsAdjustment, unexpectedExpense, unexpectedExpenseDate]);
+  }, [financialData.profileData, financialData.incomesData, financialData.billsData, financialData.expensesData, forecastPeriod, incomeAdjustment, expensesAdjustment, savingsAdjustment, unexpectedExpense, unexpectedIncome]);
 
   // Function to generate monthly breakdown from forecast data
   const generateMonthlyBreakdown = (forecast: ForecastItem[], scenarioForecast: ForecastItem[] = []) => {
@@ -578,7 +652,7 @@ export default function ForecastingPage() {
     setExpensesAdjustment(0);
     setSavingsAdjustment(0);
     setUnexpectedExpense(0);
-    setUnexpectedExpenseDate(undefined);
+    setUnexpectedIncome(0);
     setScenarioName("Default Scenario");
     setScenarioForecast([]);
   };
@@ -604,45 +678,36 @@ export default function ForecastingPage() {
   const getPeriodTotals = () => {
     if (!forecastData.length) {
       return {
-        projectedIncome: "0.00",
-        projectedExpenses: "0.00",
-        endingBalance: financialData.profileData?.currentBalance?.toFixed(2) || "0.00"
+        currentAvailable: 0,
+        projectedIncome: 0,
+        projectedExpenses: 0,
+        projectedAvailable: 0
       };
     }
 
-    // Get starting balance (current balance)
-    const startingBalance = financialData.profileData?.currentBalance || 0;
+    // Current available is the starting balance
+    const currentAvailable = forecastData[0].runningBalance || 0;
     
-    // Calculate projected income (sum of all positive amounts)
-    const projectedIncome = forecastData
-      .filter(item => item.type === 'income')
-      .reduce((sum, item) => sum + item.amount, 0);
+    // Calculate totals
+    let totalIncome = 0;
+    let totalExpenses = 0;
     
-    // Calculate projected expenses (sum of all negative amounts)
-    let projectedExpenses = forecastData
-      .filter(item => item.type === 'expense')
-      .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    forecastData.forEach(item => {
+      if (item.type === 'income') {
+        totalIncome += item.amount;
+      } else if (item.type === 'bill' || item.type === 'expense') {
+        totalExpenses += Math.abs(item.amount);
+      }
+    });
     
-    // If not including optional expenses, reduce the total
-    if (!includeOptionalExpenses) {
-      // Exclude optional expenses (we'll assume all expenses with category 'Entertainment' or 'Personal' are optional)
-      const optionalCategories = ['Entertainment', 'Personal', 'Dining', 'Shopping'];
-      const optionalExpenses = forecastData
-        .filter(item => item.type === 'expense' && optionalCategories.includes(item.category))
-        .reduce((sum, item) => sum + Math.abs(item.amount), 0);
-      
-      projectedExpenses -= optionalExpenses;
-    }
-    
-    // Get ending balance (last item's running balance)
-    const endingBalance = forecastData.length > 0 
-      ? forecastData[forecastData.length - 1].runningBalance || startingBalance
-      : startingBalance;
+    // Projected available is ending balance
+    const projectedAvailable = forecastData[forecastData.length - 1]?.runningBalance || 0;
     
     return {
-      projectedIncome: projectedIncome.toFixed(2),
-      projectedExpenses: projectedExpenses.toFixed(2),
-      endingBalance: endingBalance.toFixed(2)
+      currentAvailable,
+      projectedIncome: totalIncome,
+      projectedExpenses: totalExpenses,
+      projectedAvailable
     };
   };
 
@@ -814,7 +879,7 @@ export default function ForecastingPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-1">
-                <div className="text-2xl font-bold">${totals.endingBalance}</div>
+                <div className="text-2xl font-bold">${totals.projectedAvailable}</div>
                 {scenarioForecast.length > 0 && (
                   <div className="text-sm text-emerald-500">
                     ${scenarioForecast[scenarioForecast.length - 1]?.runningBalance?.toFixed(2) ?? 0} (Scenario)
@@ -1073,18 +1138,22 @@ export default function ForecastingPage() {
                           min="0"
                         />
                       </div>
-                      {unexpectedExpense > 0 && (
-                        <div className="mt-2">
-                          <Label htmlFor="unexpected-expense-date">
-                            Date of Unexpected Expense
-                          </Label>
-                          <Input
-                            id="unexpected-expense-date"
-                            type="date"
-                            onChange={(e) => setUnexpectedExpenseDate(e.target.valueAsDate || undefined)}
-                          />
-                        </div>
-                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="unexpected-income">
+                        One-time Unexpected Income
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <span>$</span>
+                        <Input
+                          id="unexpected-income"
+                          type="number"
+                          value={unexpectedIncome}
+                          onChange={(e) => setUnexpectedIncome(parseFloat(e.target.value) || 0)}
+                          min="0"
+                        />
+                      </div>
                     </div>
                     
                     <div className="flex gap-2 justify-end">
