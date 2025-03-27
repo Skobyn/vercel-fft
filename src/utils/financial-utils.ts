@@ -84,8 +84,12 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
     currentDate = new Date(calculateNextOccurrence(startDate.toISOString(), item.frequency));
   }
   
+  // Safety counter to prevent infinite loops
+  let safetyCounter = 0;
+  const maxOccurrences = Math.min(days, 50); // Limit to max 50 occurrences regardless of days
+  
   // Generate occurrences until we reach the end date
-  while (currentDate <= endDate) {
+  while (currentDate <= endDate && safetyCounter < maxOccurrences) {
     occurrences.push({
       itemId: item.id,
       date: currentDate.toISOString(),
@@ -96,7 +100,16 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
     });
     
     // Calculate the next occurrence based on the frequency
-    currentDate = new Date(calculateNextOccurrence(currentDate.toISOString(), item.frequency));
+    const nextDate = new Date(calculateNextOccurrence(currentDate.toISOString(), item.frequency));
+    
+    // Guard against dates not progressing (which would cause infinite loop)
+    if (nextDate <= currentDate) {
+      console.warn('Date not progressing in occurrence calculation, breaking loop');
+      break;
+    }
+    
+    currentDate = nextDate;
+    safetyCounter++;
   }
   
   return occurrences;
@@ -178,8 +191,9 @@ export function generateCashFlowForecast(
       }
     };
     
-    // For very short forecast periods (≤ 14 days), use a simpler approach to prevent memory issues
-    const isShortForecast = normalizedDays <= 14;
+    // For forecast periods ≤ 30 days, use a simpler approach to prevent memory issues
+    // Changed from 14 to 30 days to avoid crashes with 30-day forecasts
+    const isShortForecast = normalizedDays <= 30;
     
     // Process incomes with proper recurring handling based on forecast length
     safelyAddItems(validIncomes, (income) => {

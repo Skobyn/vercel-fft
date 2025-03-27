@@ -104,12 +104,21 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     setIsGeneratingForecast(true);
     setError(null);
     
+    // Use a longer timeout for larger datasets
+    const days = parseInt(timeframe);
+    const isLargeDataset = days > 30 || incomesArray.length > 10 || billsArray.length > 20;
+    const timeoutDelay = isLargeDataset ? 200 : 50; // Allow more time for larger datasets
+    
     timeoutRef.current = setTimeout(() => {
       try {
-        const days = parseInt(timeframe);
+        // Limit the number of items to process for large datasets to prevent browser freezing
+        const processableIncomes = isLargeDataset && incomesArray.length > 10 ? 
+          incomesArray.slice(0, 10) : incomesArray;
+        const processableBills = isLargeDataset && billsArray.length > 20 ? 
+          billsArray.slice(0, 20) : billsArray;
         
         // Log what we're working with
-        console.log(`Generating forecast with ${incomesArray.length} incomes and ${billsArray.length} bills`);
+        console.log(`Generating forecast with ${processableIncomes.length} incomes and ${processableBills.length} bills`);
         
         // Double-check for valid data before generating forecast
         if (typeof currentBalance !== 'number' || isNaN(currentBalance)) {
@@ -119,8 +128,8 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         // Call the forecast generation utility
         const forecast = generateCashFlowForecast(
           currentBalance,
-          incomesArray,
-          billsArray,
+          processableIncomes,
+          processableBills,
           [], // No expenses for now
           [], // No balance adjustments for now
           days
@@ -160,7 +169,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         setChartReady(true);
         timeoutRef.current = null;
       }
-    }, 50); // Small delay to allow rendering
+    }, timeoutDelay); // Small delay to allow rendering
   }, [financialData, timeframe]);
 
   const handleTimeframeChange = (value: string) => {
