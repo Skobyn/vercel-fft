@@ -48,13 +48,14 @@ const incomeFormSchema = z.object({
   }),
   frequency: z.string().min(1, "Frequency is required"),
   notes: z.string().optional(),
+  isRecurring: z.boolean().optional(),
 });
 
 type IncomeFormValues = z.infer<typeof incomeFormSchema>;
 
 interface IncomeFormProps {
   income?: Income;
-  onSubmit: (values: IncomeFormValues) => void;
+  onSubmit: (values: IncomeFormValues & { isRecurring: boolean }) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
@@ -74,6 +75,7 @@ export function IncomeForm({
     date: income?.date ? new Date(income.date) : new Date(),
     frequency: income?.frequency || "monthly",
     notes: income?.notes || "",
+    isRecurring: false,
   };
 
   const form = useForm<IncomeFormValues>({
@@ -85,10 +87,12 @@ export function IncomeForm({
   const handleSubmit = (values: IncomeFormValues) => {
     // Auto-set isRecurring based on frequency
     const isRecurring = values.frequency !== 'once';
-    onSubmit({
-      ...values,
-      isRecurring
-    });
+    
+    // Update the form value
+    values.isRecurring = isRecurring;
+    
+    // Submit the form with the updated isRecurring value
+    onSubmit(values as IncomeFormValues & { isRecurring: boolean });
   };
 
   return (

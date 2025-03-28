@@ -105,10 +105,10 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     setError(null);
     
     // Use client-side forecast generation for dashboard
-    // Fixed at 14 days for the dashboard
+    // Using the days prop from component properties
     const generateLocalForecast = () => {
       try {
-        console.log(`Generating 14-day forecast client-side`);
+        console.log(`Generating ${days}-day forecast client-side`);
         
         const forecast = generateCashFlowForecast(
           currentBalance,
@@ -116,7 +116,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
           billsArray,
           expensesArray,
           [], // No balance adjustments
-          14 // Fixed at 14 days for dashboard
+          days // Use the days prop passed to the component
         );
         
         // Update the last generation reference
@@ -162,7 +162,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         timeoutRef.current = null;
       }
     };
-  }, [financialData]);
+  }, [financialData, days]);
 
   // Show loading state if data is still loading
   if (financialData.loading || isGeneratingForecast || !chartReady) {
@@ -245,7 +245,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         <div className="flex justify-between items-center">
           <div>
             <CardTitle>Cash Flow Forecast</CardTitle>
-            <CardDescription>Projected balance over next 14 days</CardDescription>
+            <CardDescription>Projected balance over next {days} days</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -322,7 +322,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
-          Based on your current balance, income, and bills over the next 14 days.
+          Based on your current balance, income, and bills over the next {days} days.
         </p>
       </CardContent>
     </Card>
