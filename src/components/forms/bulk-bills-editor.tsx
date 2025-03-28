@@ -289,8 +289,16 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
               autoPay,
               isPaid,
               // Ensure date formats are valid or default to today
-              dueDate: type === "bills" && row.dueDate ? row.dueDate : format(new Date(), "yyyy-MM-dd"),
-              date: type === "expenses" && row.date ? row.date : format(new Date(), "yyyy-MM-dd"),
+              dueDate: type === "bills" && row.dueDate ? 
+                // Fix for date import - ensure we preserve the exact date without timezone adjustment
+                new Date(new Date(row.dueDate).getTime() + (new Date(row.dueDate).getTimezoneOffset() * 60000))
+                  .toISOString().split('T')[0] 
+                : format(new Date(), "yyyy-MM-dd"),
+              date: type === "expenses" && row.date ? 
+                // Apply same fix for expense dates
+                new Date(new Date(row.date).getTime() + (new Date(row.date).getTimezoneOffset() * 60000))
+                  .toISOString().split('T')[0]
+                : format(new Date(), "yyyy-MM-dd"),
             };
           });
           
