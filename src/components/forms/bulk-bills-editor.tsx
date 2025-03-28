@@ -303,53 +303,63 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
               isPaid,
               // Ensure date formats are valid or default to today
               dueDate: type === "bills" && row.dueDate ? 
-                // Completely new approach for dates - preserve exact date regardless of format
+                // Ultra-simple approach - just use the date string directly for YYYY-MM-DD format
+                // or create a date manually for other formats
                 (() => {
-                  // Handle ISO format dates (YYYY-MM-DD)
-                  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-                  if (isoDateRegex.test(row.dueDate)) {
-                    // For ISO dates, preserve exactly as is
-                    return row.dueDate;
+                  // Replace any quotes that might be in the CSV
+                  const cleanDateStr = row.dueDate.replace(/["']/g, '').trim();
+                  
+                  // Simple YYYY-MM-DD format check
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateStr)) {
+                    console.log('Using direct ISO date:', cleanDateStr);
+                    return cleanDateStr; // Use the string directly
                   }
                   
-                  // Handle other date formats by parsing strictly as UTC
+                  // For any other format, try to parse and convert to YYYY-MM-DD
                   try {
-                    // Parse the date parts manually to avoid timezone issues
-                    const dateObj = new Date(row.dueDate);
-                    const year = dateObj.getFullYear();
-                    const month = dateObj.getMonth() + 1; // getMonth() is 0-indexed
-                    const day = dateObj.getDate();
+                    const date = new Date(cleanDateStr);
+                    if (isNaN(date.getTime())) {
+                      throw new Error('Invalid date');
+                    }
                     
-                    // Format as YYYY-MM-DD without timezone conversion
-                    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-                  } catch(e) {
-                    console.error("Error parsing date:", row.dueDate, e);
+                    // Format manually to avoid any timezone issues
+                    const year = date.getFullYear();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
+                    const formatted = `${year}-${month}-${day}`;
+                    console.log(`Converted date ${cleanDateStr} to ${formatted}`);
+                    return formatted;
+                  } catch (e) {
+                    console.error('Error parsing date:', cleanDateStr, e);
                     return format(new Date(), "yyyy-MM-dd");
                   }
                 })()
                 : format(new Date(), "yyyy-MM-dd"),
               date: type === "expenses" && row.date ? 
-                // Apply same fix for expense dates
+                // Same approach for expense dates
                 (() => {
-                  // Handle ISO format dates (YYYY-MM-DD)
-                  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-                  if (isoDateRegex.test(row.date)) {
-                    // For ISO dates, preserve exactly as is
-                    return row.date;
+                  // Replace any quotes that might be in the CSV
+                  const cleanDateStr = row.date.replace(/["']/g, '').trim();
+                  
+                  // Simple YYYY-MM-DD format check
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateStr)) {
+                    return cleanDateStr; // Use the string directly
                   }
                   
-                  // Handle other date formats by parsing strictly as UTC
+                  // For any other format, try to parse and convert to YYYY-MM-DD
                   try {
-                    // Parse the date parts manually to avoid timezone issues
-                    const dateObj = new Date(row.date);
-                    const year = dateObj.getFullYear();
-                    const month = dateObj.getMonth() + 1; // getMonth() is 0-indexed
-                    const day = dateObj.getDate();
+                    const date = new Date(cleanDateStr);
+                    if (isNaN(date.getTime())) {
+                      throw new Error('Invalid date');
+                    }
                     
-                    // Format as YYYY-MM-DD without timezone conversion
-                    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-                  } catch(e) {
-                    console.error("Error parsing date:", row.date, e);
+                    // Format manually to avoid any timezone issues
+                    const year = date.getFullYear();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                  } catch (e) {
+                    console.error('Error parsing date:', cleanDateStr, e);
                     return format(new Date(), "yyyy-MM-dd");
                   }
                 })()
@@ -480,7 +490,23 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {type === "bills" && row.dueDate
-                          ? format(new Date(row.dueDate), "PPP")
+                          ? (() => {
+                              try {
+                                // Create date explicitly with manual parsing to avoid timezone issues
+                                const parts = row.dueDate.split('-');
+                                if (parts.length === 3) {
+                                  const year = parseInt(parts[0], 10);
+                                  const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                                  const day = parseInt(parts[2], 10);
+                                  const date = new Date(year, month, day);
+                                  return format(date, "PPP");
+                                }
+                                return format(new Date(row.dueDate), "PPP");
+                              } catch (e) {
+                                console.error("Error formatting date", e);
+                                return row.dueDate;
+                              }
+                            })()
                           : type === "expenses" && row.date
                           ? format(new Date(row.date), "PPP")
                           : "Select date"}
@@ -491,19 +517,38 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                         mode="single"
                         selected={
                           type === "bills" && row.dueDate
-                            ? new Date(row.dueDate)
+                            ? (() => {
+                                try {
+                                  // Create date explicitly with manual parsing to avoid timezone issues
+                                  const parts = row.dueDate.split('-');
+                                  if (parts.length === 3) {
+                                    const year = parseInt(parts[0], 10);
+                                    const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                                    const day = parseInt(parts[2], 10);
+                                    return new Date(year, month, day);
+                                  }
+                                  return new Date(row.dueDate);
+                                } catch (e) {
+                                  console.error("Error parsing date", e);
+                                  return new Date();
+                                }
+                              })()
                             : type === "expenses" && row.date
                             ? new Date(row.date)
                             : undefined
                         }
                         onSelect={(date) => {
                           if (date) {
-                            // Ensure we're using the local date without timezone offset
-                            const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            // Format as YYYY-MM-DD directly
+                            const year = date.getFullYear();
+                            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                            const day = date.getDate().toString().padStart(2, '0');
+                            const formattedDate = `${year}-${month}-${day}`;
+                            
                             if (type === "bills") {
-                              updateCell(index, "dueDate", localDate.toISOString().split('T')[0]);
+                              updateCell(index, "dueDate", formattedDate);
                             } else {
-                              updateCell(index, "date", localDate.toISOString().split('T')[0]);
+                              updateCell(index, "date", formattedDate);
                             }
                           }
                         }}
@@ -545,7 +590,23 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {row.endDate ? (
-                            format(new Date(row.endDate), "PPP")
+                            (() => {
+                              try {
+                                // Create date explicitly with manual parsing to avoid timezone issues
+                                const parts = row.endDate.split('-');
+                                if (parts.length === 3) {
+                                  const year = parseInt(parts[0], 10);
+                                  const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                                  const day = parseInt(parts[2], 10);
+                                  const date = new Date(year, month, day);
+                                  return format(date, "PPP");
+                                }
+                                return format(new Date(row.endDate), "PPP");
+                              } catch (e) {
+                                console.error("Error formatting end date", e);
+                                return row.endDate;
+                              }
+                            })()
                           ) : (
                             <span>No end date</span>
                           )}
@@ -554,12 +615,30 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                       <PopoverContent className="w-auto p-0">
                         <Calendar
                           mode="single"
-                          selected={row.endDate ? new Date(row.endDate) : undefined}
+                          selected={row.endDate ? (() => {
+                            try {
+                              // Create date explicitly with manual parsing to avoid timezone issues
+                              const parts = row.endDate.split('-');
+                              if (parts.length === 3) {
+                                const year = parseInt(parts[0], 10);
+                                const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                                const day = parseInt(parts[2], 10);
+                                return new Date(year, month, day);
+                              }
+                              return new Date(row.endDate);
+                            } catch (e) {
+                              console.error("Error parsing end date", e);
+                              return new Date();
+                            }
+                          })() : undefined}
                           onSelect={(date) => {
                             if (date) {
-                              // Ensure we're using the local date without timezone offset
-                              const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-                              updateCell(index, "endDate", localDate.toISOString().split('T')[0]);
+                              // Format as YYYY-MM-DD directly
+                              const year = date.getFullYear();
+                              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                              const day = date.getDate().toString().padStart(2, '0');
+                              const formattedDate = `${year}-${month}-${day}`;
+                              updateCell(index, "endDate", formattedDate);
                             }
                           }}
                           disabled={(date) =>
