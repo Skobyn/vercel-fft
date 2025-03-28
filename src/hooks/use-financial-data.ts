@@ -1004,6 +1004,8 @@ export function useFinancialData() {
 
 /**
  * Hook for fetching and managing financial accounts
+ * Provides functionality for loading, creating, updating, and deleting accounts
+ * Automatically handles setting the default account and manages active accounts
  */
 export function useAccounts() {
   const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
