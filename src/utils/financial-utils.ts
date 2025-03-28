@@ -809,12 +809,54 @@ export function matchCategory(categoryInput: string, validCategories: string[]):
   );
   if (singularPluralMatch) return singularPluralMatch;
   
+  // Try word matching - for compound words like "Car Payment" 
+  // Look for categories that have all words from input or vice versa
+  const inputWords = normalizedInput.split(/[\s\-_]+/);
+  for (const category of validCategories) {
+    const categoryWords = category.toLowerCase().split(/[\s\-_]+/);
+    
+    // Check if all input words are in the category
+    const allWordsInCategory = inputWords.every(word => 
+      categoryWords.some(catWord => catWord.includes(word) || word.includes(catWord))
+    );
+    
+    // Special cases for common bill categories
+    if (normalizedInput.includes('car') && normalizedInput.includes('payment') && 
+        category.toLowerCase() === 'car payment') {
+      return category;
+    }
+    
+    if (normalizedInput.includes('debt') && 
+        category.toLowerCase() === 'debt') {
+      return category;
+    }
+    
+    if (normalizedInput.includes('subscription') && 
+        category.toLowerCase() === 'subscriptions') {
+      return category;
+    }
+    
+    if (allWordsInCategory) return category;
+  }
+  
   // Try fuzzy match - category that contains the input
   const fuzzyMatch = validCategories.find(
     category => category.toLowerCase().includes(normalizedInput) || 
                 normalizedInput.includes(category.toLowerCase())
   );
   if (fuzzyMatch) return fuzzyMatch;
+  
+  // If no match so far, try to find partial matches
+  for (const category of validCategories) {
+    const lowerCategory = category.toLowerCase();
+    
+    // Check if the category contains any word from the input
+    for (const word of inputWords) {
+      if (word.length > 2 && lowerCategory.includes(word)) {
+        return category;
+      }
+    }
+  }
   
   // Default to the first category if no match
   return validCategories[0];

@@ -15,7 +15,13 @@ import { EXPENSE_CATEGORIES, BILL_CATEGORIES } from "@/types/financial";
 import { toast } from "sonner";
 
 // Expense categories
-const CATEGORIES = EXPENSE_CATEGORIES.map(category => ({
+const EXPENSE_CATEGORY_OPTIONS = EXPENSE_CATEGORIES.map(category => ({
+  id: category.toLowerCase().replace(/\s+/g, '-'),
+  name: category,
+}));
+
+// Bill categories
+const BILL_CATEGORY_OPTIONS = BILL_CATEGORIES.map(category => ({
   id: category.toLowerCase().replace(/\s+/g, '-'),
   name: category,
 }));
@@ -63,6 +69,9 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
   
   // Ref for file input
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Get the appropriate category options based on type
+  const categoryOptions = type === "bills" ? BILL_CATEGORY_OPTIONS : EXPENSE_CATEGORY_OPTIONS;
   
   // Create an empty row based on type
   function createEmptyRow(): BulkRowData {
@@ -329,6 +338,10 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
           // Set the normalized data as rows
           setRows(normalizedData);
           
+          // Debug info - Log what categories are being recognized (remove in production)
+          console.log("Imported categories:", normalizedData.map(row => row.category));
+          console.log("Valid categories:", validCategories);
+          
           toast.success(`Imported ${normalizedData.length} ${type}`);
         } catch (error) {
           console.error("Error parsing CSV:", error);
@@ -425,7 +438,7 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {CATEGORIES.map((category) => (
+                        {categoryOptions.map((category) => (
                           <SelectItem key={category.id} value={category.id}>
                             {category.name}
                           </SelectItem>
