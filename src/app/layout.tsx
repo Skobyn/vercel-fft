@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/providers/firebase-auth-provider";
+import { HouseholdProvider } from "@/providers/household-provider";
 
 // Configure Inter font
 const inter = Inter({ 
@@ -40,8 +41,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
-            <Toaster />
+            <HouseholdProvider>
+              {children}
+              <Toaster />
+            </HouseholdProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

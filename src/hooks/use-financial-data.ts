@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/providers/firebase-auth-provider';
 import {
-  Income, Bill, Expense, Budget, Goal, FinancialProfile
+  Income, Bill, Expense, Budget, Goal, FinancialProfile, FinancialAccount
 } from '@/types/financial';
 import * as FinancialService from '@/services/financial-service';
 import { toast } from 'sonner';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { useCurrentHousehold } from '@/providers/household-provider';
+import { db } from '@/firebase/firebaseConfig';
 
 // Helper to ensure user data is properly initialized
 const ensureUserDataInitialized = async (userId: string) => {
@@ -996,5 +999,205 @@ export function useFinancialData() {
     addGoal: goalsData.addGoal,
     updateGoal: goalsData.updateGoal,
     deleteGoal: goalsData.deleteGoal
+  };
+}
+
+/**
+ * Hook for fetching and managing financial accounts
+ */
+export function useAccounts() {
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const { user } = useAuth();
+  const { household } = useCurrentHousehold();
+
+  useEffect(() => {
+    async function fetchAccounts() {
+      if (!user || !household) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const accountsRef = collection(
+          db, 
+          `households/${household.id}/financial_accounts`
+        );
+        const q = query(accountsRef, where("is_active", "==", true));
+        const snapshot = await getDocs(q);
+        
+        const accountsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as FinancialAccount[];
+        
+        setAccounts(accountsData);
+      } catch (err) {
+        console.error("Error fetching accounts:", err);
+        setError(err instanceof Error ? err : new Error(String(err)));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAccounts();
+  }, [user, household]);
+
+  const refreshAccounts = useCallback(async () => {
+    if (!user || !household) return;
+    
+    try {
+      setLoading(true);
+      
+      const accountsRef = collection(
+        db, 
+        `households/${household.id}/financial_accounts`
+      );
+      const q = query(accountsRef, where("is_active", "==", true));
+      const snapshot = await getDocs(q);
+      
+      const accountsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FinancialAccount[];
+      
+      setAccounts(accountsData);
+      setError(null);
+    } catch (err) {
+      console.error("Error refreshing accounts:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }, [user, household]);
+
+  const addAccount = useCallback(async (accountData: Omit<FinancialAccount, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    if (!user || !household) return null;
+    
+    try {
+      setLoading(true);
+      
+      const now = new Date().toISOString();
+      const newAccount = {
+        ...accountData,
+        userId: user.uid,
+        householdId: household.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+      
+      // If this is marked as default, update other accounts to not be default
+      if (accountData.is_default) {
+        const accountsRef = collection(db, `households/${household.id}/financial_accounts`);
+        const q = query(accountsRef, where("is_default", "==", true));
+        const snapshot = await getDocs(q);
+        
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => {
+          batch.update(doc.ref, { is_default: false });
+        });
+        
+        await batch.commit();
+      }
+      
+      const docRef = await addDoc(
+        collection(db, `households/${household.id}/financial_accounts`),
+        newAccount
+      );
+      
+      const addedAccount = { id: docRef.id, ...newAccount } as FinancialAccount;
+      setAccounts(prev => [...prev, addedAccount]);
+      
+      return addedAccount;
+    } catch (err) {
+      console.error("Error adding account:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [user, household]);
+
+  const updateAccount = useCallback(async (id: string, accountData: Partial<FinancialAccount>) => {
+    if (!user || !household) return false;
+    
+    try {
+      setLoading(true);
+      
+      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
+      
+      // If this account is being marked as default, update other accounts
+      if (accountData.is_default) {
+        const accountsRef = collection(db, `households/${household.id}/financial_accounts`);
+        const q = query(accountsRef, where("is_default", "==", true));
+        const snapshot = await getDocs(q);
+        
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => {
+          if (doc.id !== id) {
+            batch.update(doc.ref, { is_default: false });
+          }
+        });
+        
+        await batch.commit();
+      }
+      
+      await updateDoc(accountRef, {
+        ...accountData,
+        updatedAt: new Date().toISOString(),
+      });
+      
+      // Update local state
+      setAccounts(prev => 
+        prev.map(account => account.id === id 
+          ? { ...account, ...accountData, updatedAt: new Date().toISOString() } 
+          : accountData.is_default ? { ...account, is_default: false } : account
+        )
+      );
+      
+      return true;
+    } catch (err) {
+      console.error("Error updating account:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [user, household]);
+
+  const deleteAccount = useCallback(async (id: string) => {
+    if (!user || !household) return false;
+    
+    try {
+      setLoading(true);
+      
+      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
+      await deleteDoc(accountRef);
+      
+      // Update local state
+      setAccounts(prev => prev.filter(account => account.id !== id));
+      
+      return true;
+    } catch (err) {
+      console.error("Error deleting account:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [user, household]);
+
+  return {
+    accounts,
+    loading,
+    error,
+    refreshAccounts,
+    addAccount,
+    updateAccount,
+    deleteAccount
   };
 } 

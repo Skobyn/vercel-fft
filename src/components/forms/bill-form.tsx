@@ -34,6 +34,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BILL_CATEGORIES } from "@/types/financial";
 import { Bill } from "@/types/financial";
+import { formatCurrency } from "@/utils/financial-utils";
+import { useAccounts } from "@/hooks/use-financial-data";
+import { FinancialAccount } from "@/types/financial";
 
 const billFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -50,6 +53,7 @@ const billFormSchema = z.object({
   autoPay: z.boolean().default(false),
   notes: z.string().optional(),
   endDate: z.date().optional(),
+  account_id: z.string().optional(),
 });
 
 type BillFormValues = z.infer<typeof billFormSchema>;
@@ -68,6 +72,9 @@ export default function BillForm({
   isSubmitting = false,
 }: BillFormProps) {
   const isEditing = !!bill;
+  const [currentAmount, setCurrentAmount] = useState(bill?.amount || 0);
+  const { accounts, loading: loadingAccounts } = useAccounts();
+  const [defaultAccount, setDefaultAccount] = useState<string | undefined>(undefined);
 
   const defaultValues: Partial<BillFormValues> = {
     name: bill?.name || "",
@@ -79,6 +86,7 @@ export default function BillForm({
     autoPay: bill?.autoPay || false,
     notes: bill?.notes || "",
     endDate: bill?.endDate ? new Date(bill.endDate) : undefined,
+    account_id: bill?.account_id || defaultAccount,
   };
 
   const form = useForm<BillFormValues>({
@@ -87,14 +95,40 @@ export default function BillForm({
     mode: "onChange",
   });
 
+  // Find default account on load
+  useEffect(() => {
+    if (!bill?.account_id && accounts && accounts.length > 0) {
+      const defaultAcc = accounts.find(acc => acc.is_default);
+      if (defaultAcc) {
+        setDefaultAccount(defaultAcc.id);
+        form.setValue('account_id', defaultAcc.id);
+      } else if (accounts.length > 0) {
+        setDefaultAccount(accounts[0].id);
+        form.setValue('account_id', accounts[0].id);
+      }
+    }
+  }, [accounts, bill, form]);
+
+  // Event handler for number input changes
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numValue = value === "" ? 0 : parseFloat(value);
+    setCurrentAmount(numValue);
+    form.setValue("amount", numValue);
+  };
+
+  // Format the current amount for display
+  const formattedAmount = formatCurrency(currentAmount);
+
   const handleSubmit = (values: BillFormValues) => {
-    // Set isRecurring based on frequency
-    const submissionValues = {
+    // Auto-set isRecurring based on frequency
+    const isRecurring = values.frequency !== 'once';
+    
+    // Include account_id in submission
+    onSubmit({
       ...values,
-      isRecurring: values.frequency !== "once"
-    };
-    console.log('Submitting bill form with data:', submissionValues);
-    onSubmit(submissionValues);
+      isRecurring,
+    });
   };
 
   return (
@@ -127,11 +161,7 @@ export default function BillForm({
                     type="number"
                     step="0.01"
                     {...field}
-                    onChange={(e) => {
-                      field.onChange(
-                        e.target.value === "" ? 0 : parseFloat(e.target.value)
-                      );
-                    }}
+                    onChange={handleAmountChange}
                   />
                 </FormControl>
                 <FormMessage />
@@ -331,6 +361,43 @@ export default function BillForm({
                 <FormControl>
                   <Input placeholder="Additional information" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Account</FormLabel>
+                <Select 
+                  onValueChange={field.onChange}
+                  value={field.value || ""}
+                  disabled={loadingAccounts}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingAccounts ? "Loading accounts..." : "Select account"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {accounts?.map((account: FinancialAccount) => (
+                      <SelectItem 
+                        key={account.id} 
+                        value={account.id}
+                      >
+                        {account.name} {account.is_default && "(Default)"}
+                      </SelectItem>
+                    ))}
+                    {accounts?.length === 0 && (
+                      <SelectItem value="" disabled>
+                        No accounts available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

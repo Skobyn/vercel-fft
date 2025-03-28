@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,24 +31,37 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { INCOME_CATEGORIES } from "@/types/financial";
-import { Income } from "@/types/financial";
 import { Textarea } from "@/components/ui/textarea";
+import { INCOME_CATEGORIES, Income } from "@/types/financial";
+import { formatCurrency } from "@/utils/financial-utils";
+import { useAccounts } from "@/hooks/use-financial-data";
+import { FinancialAccount } from "@/types/financial";
 
+// Form schema
 const incomeFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   amount: z.coerce
     .number()
     .min(0.01, "Amount must be greater than 0")
     .nonnegative("Amount must be non-negative"),
-  category: z.string().min(1, "Category is required"),
   date: z.date({
     required_error: "Date is required",
   }),
-  frequency: z.string().min(1, "Frequency is required"),
+  category: z.string().min(1, "Category is required"),
+  frequency: z.enum([
+    "once",
+    "daily",
+    "weekly", 
+    "biweekly", 
+    "monthly", 
+    "quarterly", 
+    "annually"
+  ], {
+    required_error: "Frequency is required",
+  }),
   notes: z.string().optional(),
   isRecurring: z.boolean().optional(),
+  account_id: z.string().optional(),
 });
 
 type IncomeFormValues = z.infer<typeof incomeFormSchema>;
@@ -66,33 +79,60 @@ export function IncomeForm({
   onCancel,
   isSubmitting = false,
 }: IncomeFormProps) {
-  const isEditing = !!income;
-
-  const defaultValues: Partial<IncomeFormValues> = {
-    name: income?.name || "",
-    amount: income?.amount || 0,
-    category: income?.category || "",
-    date: income?.date ? new Date(income.date) : new Date(),
-    frequency: income?.frequency || "monthly",
-    notes: income?.notes || "",
-    isRecurring: false,
-  };
-
+  const [currentAmount, setCurrentAmount] = useState(income?.amount || 0);
+  const { accounts, loading: loadingAccounts } = useAccounts();
+  const [defaultAccount, setDefaultAccount] = useState<string | undefined>(undefined);
+  
+  // Set up the form with default values from the income object (if editing)
   const form = useForm<IncomeFormValues>({
     resolver: zodResolver(incomeFormSchema),
-    defaultValues,
+    defaultValues: {
+      name: income?.name || "",
+      amount: income?.amount || 0,
+      date: income?.date ? new Date(income.date) : new Date(),
+      category: income?.category || "Salary",
+      frequency: income?.frequency || "monthly",
+      notes: income?.notes || "",
+      isRecurring: income?.isRecurring !== undefined ? income.isRecurring : false,
+      account_id: income?.account_id || defaultAccount,
+    },
     mode: "onChange",
   });
 
+  // Find default account on load
+  useEffect(() => {
+    if (!income?.account_id && accounts && accounts.length > 0) {
+      const defaultAcc = accounts.find(acc => acc.is_default);
+      if (defaultAcc) {
+        setDefaultAccount(defaultAcc.id);
+        form.setValue('account_id', defaultAcc.id);
+      } else if (accounts.length > 0) {
+        setDefaultAccount(accounts[0].id);
+        form.setValue('account_id', accounts[0].id);
+      }
+    }
+  }, [accounts, income, form]);
+
+  // Event handler for number input changes
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const numValue = value === "" ? 0 : parseFloat(value);
+    setCurrentAmount(numValue);
+    form.setValue("amount", numValue);
+  };
+
+  // Format the current amount for display
+  const formattedAmount = formatCurrency(currentAmount);
+
+  // Handle form submission
   const handleSubmit = (values: IncomeFormValues) => {
-    // Auto-set isRecurring based on frequency
-    const isRecurring = values.frequency !== 'once';
+    // Set isRecurring based on frequency
+    const isRecurring = values.frequency !== "once";
     
-    // Update the form value
-    values.isRecurring = isRecurring;
-    
-    // Submit the form with the updated isRecurring value
-    onSubmit(values as IncomeFormValues & { isRecurring: boolean });
+    onSubmit({
+      ...values,
+      isRecurring,
+    });
   };
 
   return (
@@ -106,7 +146,7 @@ export function IncomeForm({
               <FormItem>
                 <FormLabel>Income Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Salary, Freelance, etc" {...field} />
+                  <Input placeholder="Salary, Freelance Work, etc" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -124,42 +164,11 @@ export function IncomeForm({
                     placeholder="0.00"
                     type="number"
                     step="0.01"
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(
-                        e.target.value === "" ? 0 : parseFloat(e.target.value)
-                      );
-                    }}
+                    value={field.value}
+                    onChange={handleAmountChange}
                   />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {INCOME_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormDescription>{formattedAmount}</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -176,7 +185,9 @@ export function IncomeForm({
                     <FormControl>
                       <Button
                         variant={"outline"}
-                        className="w-full pl-3 text-left font-normal"
+                        className={`w-full pl-3 text-left font-normal ${
+                          !field.value ? "text-muted-foreground" : ""
+                        }`}
                       >
                         {field.value ? (
                           format(field.value, "PPP")
@@ -192,6 +203,9 @@ export function IncomeForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      disabled={(date) =>
+                        date < addDays(new Date(), -90) // Can't pick dates more than 90 days in the past
+                      }
                       initialFocus
                     />
                   </PopoverContent>
@@ -233,22 +247,87 @@ export function IncomeForm({
 
           <FormField
             control={form.control}
-            name="notes"
+            name="category"
             render={({ field }) => (
-              <FormItem className="md:col-span-2">
-                <FormLabel>Notes (Optional)</FormLabel>
-                <FormControl>
-                  <Textarea 
-                    placeholder="Additional information" 
-                    className="resize-none" 
-                    {...field} 
-                  />
-                </FormControl>
+              <FormItem>
+                <FormLabel>Category</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {INCOME_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Account</FormLabel>
+                <Select 
+                  onValueChange={field.onChange}
+                  value={field.value || ""}
+                  disabled={loadingAccounts}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingAccounts ? "Loading accounts..." : "Select account"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {accounts?.map((account: FinancialAccount) => (
+                      <SelectItem 
+                        key={account.id} 
+                        value={account.id}
+                      >
+                        {account.name} {account.is_default && "(Default)"}
+                      </SelectItem>
+                    ))}
+                    {accounts?.length === 0 && (
+                      <SelectItem value="" disabled>
+                        No accounts available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (Optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Any additional details..."
+                  className="min-h-[80px] resize-y"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="flex justify-end space-x-4">
           {onCancel && (
@@ -264,7 +343,7 @@ export function IncomeForm({
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? "Saving..."
-              : isEditing
+              : income
               ? "Update Income"
               : "Add Income"}
           </Button>

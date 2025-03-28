@@ -106,50 +106,58 @@ export async function createDefaultCategories(householdId: string): Promise<void
 /**
  * Creates default accounts for a household
  * @param householdId - The household ID
+ * @param userId - The user ID
  */
-export async function createDefaultAccounts(householdId: string): Promise<void> {
+export async function createDefaultAccounts(householdId: string, userId: string): Promise<void> {
   try {
     // Check if db is null before using it
     if (!db) {
       throw new Error('Firestore is not initialized');
     }
     
+    const now = Timestamp.now();
     const defaultAccounts = [
       { 
         name: 'Checking Account', 
         type: 'checking', 
         balance: 1000, 
         currency: 'USD',
-        is_active: true 
+        is_active: true,
+        is_default: true
       },
       { 
         name: 'Savings Account', 
         type: 'savings', 
         balance: 5000, 
         currency: 'USD',
-        is_active: true 
+        is_active: true,
+        is_default: false
       },
       { 
         name: 'Credit Card', 
         type: 'credit', 
-        balance: 0, 
+        balance: -500, // Credit cards typically start with negative or zero balance
         currency: 'USD',
-        is_active: true 
+        is_active: true,
+        is_default: false
       }
     ];
 
     for (const account of defaultAccounts) {
-      await addDoc(collection(db, 'financial_accounts'), {
+      await addDoc(collection(db, `households/${householdId}/financial_accounts`), {
         ...account,
-        household_id: householdId,
+        userId: userId,
+        householdId: householdId,
         institution: 'Example Bank',
         account_number: '****' + Math.floor(1000 + Math.random() * 9000),
-        created_at: Timestamp.now(),
-        updated_at: Timestamp.now()
+        created_at: now,
+        updated_at: now
       });
     }
+    
+    console.log(`Created default accounts for household: ${householdId}`);
   } catch (error) {
-    console.error('Error creating default accounts:', error);
+    console.error("Error creating default accounts:", error);
     throw error;
   }
 }
@@ -168,7 +176,7 @@ export async function initializeUserData(userId: string, householdName?: string)
     await createDefaultCategories(householdId);
     
     // Create default accounts
-    await createDefaultAccounts(householdId);
+    await createDefaultAccounts(householdId, userId);
     
     console.log('User data initialized successfully!');
   } catch (error) {

@@ -20,6 +20,7 @@ export interface Income extends BaseItem {
   category: string;
   notes?: string;
   isRecurring: boolean;
+  account_id?: string; // ID of the account this income goes to
 }
 
 // Bill/payment
@@ -34,6 +35,7 @@ export interface Bill extends BaseItem {
   notes?: string;
   isRecurring: boolean;
   autoPay: boolean;
+  account_id?: string; // ID of the account this bill is paid from
 }
 
 // Expense entry
@@ -42,6 +44,20 @@ export interface Expense extends BaseItem {
   category: string;
   notes?: string;
   isPlanned: boolean; // Whether this was a planned expense
+  account_id?: string; // ID of the account this expense is paid from
+}
+
+// Financial Account
+export interface FinancialAccount extends BaseItem {
+  type: 'checking' | 'savings' | 'credit' | 'investment' | 'loan' | 'other';
+  balance: number;
+  currency: string;
+  institution?: string;
+  account_number?: string; 
+  is_active: boolean;
+  is_default: boolean;
+  plaid_account_id?: string;
+  householdId?: string;
 }
 
 // Budget category
