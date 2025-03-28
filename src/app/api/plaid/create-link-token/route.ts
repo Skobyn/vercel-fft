@@ -3,6 +3,9 @@ import { plaidClient } from '@/lib/plaid-client';
 import { CountryCode, Products } from 'plaid';
 import { getCurrentUser } from '@/lib/firebase-client';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 export async function POST() {
   try {
     // Check if user is authenticated via Firebase using getCurrentUser helper

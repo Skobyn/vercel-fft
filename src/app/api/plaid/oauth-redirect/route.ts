@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// This route needs to be dynamically rendered because it uses URL parameters
+export const dynamic = 'force-dynamic';
+
 /**
  * This route handles OAuth redirects from Plaid
  * It's used when a user completes the OAuth flow with their bank

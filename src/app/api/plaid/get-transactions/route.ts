@@ -3,6 +3,9 @@ import { plaidClient } from '@/lib/plaid-client';
 import { getCurrentUser } from '@/lib/firebase-client';
 import { getPlaidToken, storePlaidTransactions } from '@/lib/plaid-firebase';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Check if user is authenticated via Firebase
