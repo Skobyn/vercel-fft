@@ -47,7 +47,6 @@ const incomeFormSchema = z.object({
     required_error: "Date is required",
   }),
   frequency: z.string().min(1, "Frequency is required"),
-  isRecurring: z.boolean().default(false),
   notes: z.string().optional(),
 });
 
@@ -74,7 +73,6 @@ export function IncomeForm({
     category: income?.category || "",
     date: income?.date ? new Date(income.date) : new Date(),
     frequency: income?.frequency || "monthly",
-    isRecurring: income?.isRecurring || false,
     notes: income?.notes || "",
   };
 
@@ -85,7 +83,12 @@ export function IncomeForm({
   });
 
   const handleSubmit = (values: IncomeFormValues) => {
-    onSubmit(values);
+    // Auto-set isRecurring based on frequency
+    const isRecurring = values.frequency !== 'once';
+    onSubmit({
+      ...values,
+      isRecurring
+    });
   };
 
   return (
@@ -220,27 +223,6 @@ export function IncomeForm({
                   </SelectContent>
                 </Select>
                 <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="isRecurring"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Recurring Income</FormLabel>
-                  <FormDescription>
-                    This income repeats regularly
-                  </FormDescription>
-                </div>
               </FormItem>
             )}
           />

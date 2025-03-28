@@ -270,7 +270,9 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
       <CardHeader>
         <CardTitle>Expected Income</CardTitle>
         <CardDescription>
-          {upcomingIncomes.length > 0 ? `${upcomingIncomes.length} income entries in the next 30 days` : "No upcoming income"}
+          {upcomingIncomes.length > 0 && window.location.pathname.includes("upcoming") 
+            ? `${upcomingIncomes.length} income entries in the next 30 days` 
+            : `Showing ${incomes.length} income sources`}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -284,7 +286,9 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
           </div>
         ) : (
           <div className="space-y-4">
-            {(upcomingIncomes.length > 0 ? upcomingIncomes : incomes).map((income) => (
+            {(upcomingIncomes.length > 0 && window.location.pathname.includes("upcoming") 
+              ? upcomingIncomes 
+              : incomes).map((income) => (
               <div
                 key={income.id}
                 className="flex items-center justify-between border-b last:border-b-0 pb-3 last:pb-0"
