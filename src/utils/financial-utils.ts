@@ -77,16 +77,86 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + days);
   
-  // Start from the original date or today if it's in the past
-  let currentDate = new Date(item[dateField] as string);
-  if (currentDate < startDate) {
-    // If the original date is in the past, calculate the next occurrence from today
-    currentDate = new Date(calculateNextOccurrence(startDate.toISOString(), item.frequency));
+  // Start from the original date or calculate the next one if it's in the past
+  let originalDate = new Date(item[dateField] as string);
+  let currentDate: Date;
+  
+  // If the original date is in the past, find the next occurrence based on frequency
+  if (originalDate < startDate) {
+    // Calculate how many occurrences should have happened since the original date
+    const timeDiff = startDate.getTime() - originalDate.getTime();
+    let nextDate: Date;
+    
+    // Calculate the next occurrence after today based on frequency
+    switch (item.frequency) {
+      case 'daily': {
+        const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        nextDate = new Date(originalDate);
+        nextDate.setDate(nextDate.getDate() + daysDiff + 1);
+        break;
+      }
+      case 'weekly': {
+        const weeksDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24 * 7));
+        nextDate = new Date(originalDate);
+        nextDate.setDate(nextDate.getDate() + (weeksDiff + 1) * 7);
+        break;
+      }
+      case 'biweekly': {
+        const biweeksDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24 * 14));
+        nextDate = new Date(originalDate);
+        nextDate.setDate(nextDate.getDate() + (biweeksDiff + 1) * 14);
+        break;
+      }
+      case 'monthly': {
+        // Get the day of month from original date
+        const originalDay = originalDate.getDate();
+        const monthsDiff = (startDate.getFullYear() - originalDate.getFullYear()) * 12 
+                         + startDate.getMonth() - originalDate.getMonth();
+        
+        nextDate = new Date(originalDate);
+        nextDate.setMonth(nextDate.getMonth() + monthsDiff + 1);
+        
+        // Handle month length issues (e.g., Jan 31 -> Feb 28)
+        const maxDayInMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(originalDay, maxDayInMonth));
+        break;
+      }
+      case 'quarterly': {
+        const quartersDiff = Math.floor((startDate.getFullYear() - originalDate.getFullYear()) * 4 
+                           + (startDate.getMonth() - originalDate.getMonth()) / 3);
+        nextDate = new Date(originalDate);
+        nextDate.setMonth(nextDate.getMonth() + (quartersDiff + 1) * 3);
+        break;
+      }
+      case 'semiannually': {
+        const halfYearsDiff = Math.floor((startDate.getFullYear() - originalDate.getFullYear()) * 2 
+                            + (startDate.getMonth() - originalDate.getMonth()) / 6);
+        nextDate = new Date(originalDate);
+        nextDate.setMonth(nextDate.getMonth() + (halfYearsDiff + 1) * 6);
+        break;
+      }
+      case 'annually': {
+        const yearsDiff = startDate.getFullYear() - originalDate.getFullYear();
+        nextDate = new Date(originalDate);
+        nextDate.setFullYear(nextDate.getFullYear() + yearsDiff + 1);
+        break;
+      }
+      default:
+        // Default to next day for unknown frequencies
+        nextDate = new Date(startDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+    }
+    
+    // Use the calculated next date as our starting point
+    currentDate = nextDate;
+  } else {
+    // If original date is in the future, use it
+    currentDate = new Date(originalDate);
   }
   
   // Safety counter to prevent infinite loops
   let safetyCounter = 0;
-  const maxOccurrences = Math.min(days, 50); // Limit to max 50 occurrences regardless of days
+  const maxOccurrences = days >= 180 ? 100 : (days >= 90 ? 50 : 30); // More occurrences for longer forecasts
   
   // Generate occurrences until we reach the end date
   while (currentDate <= endDate && safetyCounter < maxOccurrences) {
@@ -96,11 +166,46 @@ export function generateOccurrences<T extends { id: string; frequency: string; a
       amount: item.amount,
       category: (item as any).category || 'unknown',
       name: (item as any).name || 'Unnamed Item',
-      type: item.amount >= 0 ? 'income' : 'expense'
+      type: item.amount >= 0 ? 'income' : 'expense',
+      description: `${(item as any).name || 'Unnamed Item'} (${(item as any).category || 'unknown'})${item.frequency !== 'once' ? ' - Recurring' : ''}`
     });
     
     // Calculate the next occurrence based on the frequency
-    const nextDate = new Date(calculateNextOccurrence(currentDate.toISOString(), item.frequency));
+    let nextDate = new Date(currentDate);
+    
+    switch (item.frequency) {
+      case 'daily':
+        nextDate.setDate(nextDate.getDate() + 1);
+        break;
+      case 'weekly':
+        nextDate.setDate(nextDate.getDate() + 7);
+        break;
+      case 'biweekly':
+        nextDate.setDate(nextDate.getDate() + 14);
+        break;
+      case 'monthly': {
+        // Preserve the day of month where possible
+        const originalDay = originalDate.getDate();
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        
+        // Handle month length issues (e.g., Jan 31 -> Feb 28)
+        const maxDayInMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(originalDay, maxDayInMonth));
+        break;
+      }
+      case 'quarterly':
+        nextDate.setMonth(nextDate.getMonth() + 3);
+        break;
+      case 'semiannually':
+        nextDate.setMonth(nextDate.getMonth() + 6);
+        break;
+      case 'annually':
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+        break;
+      default:
+        // For unsupported frequencies, just add 30 days
+        nextDate.setDate(nextDate.getDate() + 30);
+    }
     
     // Guard against dates not progressing (which would cause infinite loop)
     if (nextDate <= currentDate) {
@@ -200,8 +305,8 @@ export function generateCashFlowForecast(
       // Only process valid income items
       if (!income.id || !income.date || isNaN(income.amount)) return null;
       
-      // For recurring items in short forecasts, only generate if they occur in the period
-      if (income.isRecurring && income.frequency && !isShortForecast) {
+      // Always generate all occurrences for recurring items regardless of forecast length
+      if (income.isRecurring && income.frequency) {
         return generateOccurrences(
           {
             ...income,
@@ -212,25 +317,6 @@ export function generateCashFlowForecast(
           'date',
           normalizedDays
         );
-      } else if (income.isRecurring && income.frequency && isShortForecast) {
-        // For short forecasts, only include if the next occurrence is within the forecast period
-        const nextDate = new Date(calculateNextOccurrence(income.date, income.frequency));
-        const forecastEndDate = new Date();
-        forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
-        
-        if (nextDate <= forecastEndDate) {
-          return {
-            itemId: income.id,
-            date: nextDate.toISOString(),
-            amount: income.amount,
-            category: income.category || 'Income',
-            name: income.name || 'Income',
-            type: 'income',
-            runningBalance: 0, // Will be calculated later
-            description: `${income.name} (${income.category}) - Next occurrence`
-          };
-        }
-        return null;
       }
       
       // For non-recurring items, just add the single occurrence if within forecast period
@@ -262,8 +348,8 @@ export function generateCashFlowForecast(
       // Only process valid bill items
       if (!bill.id || !bill.dueDate || isNaN(bill.amount)) return null;
       
-      // For recurring bills in short forecasts, only generate if they occur in the period
-      if (bill.isRecurring && bill.frequency && !isShortForecast) {
+      // Always generate all occurrences for recurring items regardless of forecast length
+      if (bill.isRecurring && bill.frequency) {
         return generateOccurrences(
           {
             ...bill,
@@ -279,25 +365,6 @@ export function generateCashFlowForecast(
           type: 'bill',
           description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
         }));
-      } else if (bill.isRecurring && bill.frequency && isShortForecast) {
-        // For short forecasts, only include if the next occurrence is within the forecast period
-        const nextDate = new Date(calculateNextOccurrence(bill.dueDate, bill.frequency));
-        const forecastEndDate = new Date();
-        forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
-        
-        if (nextDate <= forecastEndDate) {
-          return {
-            itemId: bill.id,
-            date: nextDate.toISOString(),
-            amount: -Math.abs(bill.amount),
-            category: bill.category || 'Expense',
-            name: bill.name || 'Bill',
-            type: 'bill',
-            runningBalance: 0, // Will be calculated later
-            description: `${bill.name} (${bill.category}) - Due${bill.autoPay ? ' - AutoPay' : ''}`
-          };
-        }
-        return null;
       }
       
       // For non-recurring bills, just add the single occurrence if within forecast period
@@ -321,18 +388,32 @@ export function generateCashFlowForecast(
       return null;
     }, 'bill');
 
-    // Process expenses with date filtering
+    // Process expenses with similar recurring handling
     safelyAddItems(validExpenses, (expense) => {
       // Only process valid expense items
       if (!expense.id || !expense.date || isNaN(expense.amount)) return null;
       
-      // Only include expenses if they are within the forecast period
-      const expenseDate = new Date(expense.date);
+      // Always generate all occurrences for recurring items regardless of forecast length
+      if (expense.isRecurring && expense.frequency) {
+        return generateOccurrences(
+          {
+            ...expense,
+            id: expense.id,
+            frequency: expense.frequency,
+            amount: -Math.abs(expense.amount) // Ensure expenses are negative
+          },
+          'date',
+          normalizedDays
+        );
+      }
+      
+      // For non-recurring expenses, just add the single occurrence if within forecast period
+      const itemDate = new Date(expense.date);
       const currentDate = new Date();
       const forecastEndDate = new Date();
       forecastEndDate.setDate(forecastEndDate.getDate() + normalizedDays);
       
-      if (expenseDate >= currentDate && expenseDate <= forecastEndDate) {
+      if (itemDate >= currentDate && itemDate <= forecastEndDate) {
         return {
           itemId: expense.id,
           date: expense.date,
@@ -341,7 +422,7 @@ export function generateCashFlowForecast(
           name: expense.name || 'Expense',
           type: 'expense',
           runningBalance: 0, // Will be calculated later
-          description: `${expense.name} (${expense.category})${expense.isPlanned ? ' - Planned' : ' - Unplanned'}`
+          description: `${expense.name} (${expense.category})`
         };
       }
       return null;

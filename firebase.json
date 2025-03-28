@@ -13,5 +13,11 @@
     "frameworksBackend": {
       "region": "us-central1"
     }
+  },
+  "functions": {
+    "source": "functions",
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" install"
+    ]
   }
 } 
