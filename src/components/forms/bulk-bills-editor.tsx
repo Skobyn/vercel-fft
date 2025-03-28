@@ -303,36 +303,54 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
               isPaid,
               // Ensure date formats are valid or default to today
               dueDate: type === "bills" && row.dueDate ? 
-                // Parse and adjust date to avoid timezone issues
+                // Completely new approach for dates - preserve exact date regardless of format
                 (() => {
-                  // First check if the date is in YYYY-MM-DD format
-                  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-                  if (dateRegex.test(row.dueDate)) {
-                    // If it's already in YYYY-MM-DD format, don't adjust it
+                  // Handle ISO format dates (YYYY-MM-DD)
+                  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                  if (isoDateRegex.test(row.dueDate)) {
+                    // For ISO dates, preserve exactly as is
                     return row.dueDate;
-                  } else {
-                    // Otherwise parse and adjust for timezone
-                    const date = new Date(row.dueDate);
-                    // Add a full day to compensate for timezone issues
-                    date.setDate(date.getDate() + 1);
-                    return date.toISOString().split('T')[0];
+                  }
+                  
+                  // Handle other date formats by parsing strictly as UTC
+                  try {
+                    // Parse the date parts manually to avoid timezone issues
+                    const dateObj = new Date(row.dueDate);
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth() + 1; // getMonth() is 0-indexed
+                    const day = dateObj.getDate();
+                    
+                    // Format as YYYY-MM-DD without timezone conversion
+                    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                  } catch(e) {
+                    console.error("Error parsing date:", row.dueDate, e);
+                    return format(new Date(), "yyyy-MM-dd");
                   }
                 })()
                 : format(new Date(), "yyyy-MM-dd"),
               date: type === "expenses" && row.date ? 
                 // Apply same fix for expense dates
                 (() => {
-                  // First check if the date is in YYYY-MM-DD format
-                  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-                  if (dateRegex.test(row.date)) {
-                    // If it's already in YYYY-MM-DD format, don't adjust it
+                  // Handle ISO format dates (YYYY-MM-DD)
+                  const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                  if (isoDateRegex.test(row.date)) {
+                    // For ISO dates, preserve exactly as is
                     return row.date;
-                  } else {
-                    // Otherwise parse and adjust for timezone
-                    const date = new Date(row.date);
-                    // Add a full day to compensate for timezone issues
-                    date.setDate(date.getDate() + 1);
-                    return date.toISOString().split('T')[0];
+                  }
+                  
+                  // Handle other date formats by parsing strictly as UTC
+                  try {
+                    // Parse the date parts manually to avoid timezone issues
+                    const dateObj = new Date(row.date);
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth() + 1; // getMonth() is 0-indexed
+                    const day = dateObj.getDate();
+                    
+                    // Format as YYYY-MM-DD without timezone conversion
+                    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                  } catch(e) {
+                    console.error("Error parsing date:", row.date, e);
+                    return format(new Date(), "yyyy-MM-dd");
                   }
                 })()
                 : format(new Date(), "yyyy-MM-dd"),
