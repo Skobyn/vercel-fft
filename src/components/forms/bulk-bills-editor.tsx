@@ -70,8 +70,12 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
   // Ref for file input
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Get the appropriate category options based on type
+  // Get the appropriate category options based on type - ensure this is used
   const categoryOptions = type === "bills" ? BILL_CATEGORY_OPTIONS : EXPENSE_CATEGORY_OPTIONS;
+  
+  // Debug output to console
+  console.log("BulkBillsEditor type:", type);
+  console.log("Using category options:", categoryOptions.map(c => c.name));
   
   // Create an empty row based on type
   function createEmptyRow(): BulkRowData {
@@ -79,7 +83,7 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
       return {
         name: "",
         amount: "",
-        category: "housing",
+        category: BILL_CATEGORIES[0].toLowerCase().replace(/\s+/g, '-'),
         frequency: "monthly",
         dueDate: format(new Date(), "yyyy-MM-dd"),
         endDate: "",
@@ -92,7 +96,7 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
       return {
         name: "",
         amount: "",
-        category: "housing",
+        category: EXPENSE_CATEGORIES[0].toLowerCase().replace(/\s+/g, '-'),
         frequency: "once",
         date: format(new Date(), "yyyy-MM-dd"),
         isPlanned: true,
