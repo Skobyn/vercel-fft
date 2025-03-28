@@ -199,20 +199,31 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
         amount: data.amount,
         frequency: data.frequency,
         category: data.category,
-        dueDate: new Date().toISOString(), // Set due date to current date
+        dueDate: data.dueDate || new Date().toISOString(), // Use provided due date or default to current date
         isPaid: false,
         autoPay: false,
         notes: '',
         isRecurring: data.frequency !== 'once', // Set isRecurring based on frequency
       };
       
+      console.log("Adding bill from setup guide:", billData);
+      console.log("User ID:", user.uid);
+      
       // Use the financial service to add a bill instead of an expense
-      await addBill(billData, user.uid);
+      const result = await addBill(billData, user.uid);
+      console.log("Bill added successfully:", result);
       
       // Mark this step as completed
       markStepComplete("expenses");
       
       toast.success(`${data.name} has been added to your bills`);
+      
+      // Close the setup guide if all steps are completed
+      if (onClose && steps.every(step => step.id === "expenses" || step.isCompleted)) {
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
     } catch (error) {
       console.error('Error adding expense as bill:', error);
       toast.error("Failed to add bill. Please try again.");

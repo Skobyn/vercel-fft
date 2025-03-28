@@ -39,6 +39,7 @@ const formSchema = z.object({
   frequency: z.enum(["weekly", "biweekly", "monthly", "yearly"], {
     required_error: "Please select a frequency",
   }),
+  dueDate: z.string().optional(),
 });
 
 type AddExpenseFormProps = {
@@ -56,6 +57,7 @@ export default function AddExpenseForm({ onAddExpense }: AddExpenseFormProps) {
       amount: "",
       category: "Housing",
       frequency: "monthly",
+      dueDate: new Date().toISOString().split('T')[0], // Set default due date to today
     },
     mode: "onChange",
   });
@@ -176,6 +178,23 @@ export default function AddExpenseForm({ onAddExpense }: AddExpenseFormProps) {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="dueDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Due Date</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
