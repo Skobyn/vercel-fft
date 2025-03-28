@@ -26,7 +26,7 @@ export async function POST() {
       user: {
         client_user_id: clientUserId,
       },
-      client_name: 'Financial Flow',
+      client_name: 'Achievr',
       products: [Products.Transactions, Products.Auth],
       country_codes: [CountryCode.Us],
       language: 'en',

@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { CircleDollarSign, ArrowLeft } from "lucide-react";
+import { CircleDollarSign, ArrowLeft, TrendingUp } from "lucide-react";
 
 // Form validation schema
 const formSchema = z.object({
@@ -74,10 +74,10 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/40">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center space-y-2 mb-6">
-          <div className="p-2 bg-primary text-primary-foreground rounded-full">
-            <CircleDollarSign className="h-6 w-6" />
+          <div className="p-2 bg-green-600 text-white rounded-full">
+            <TrendingUp className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold">Financial Flow</h1>
+          <h1 className="text-2xl font-bold">Achievr</h1>
         </div>
 
         <Card>

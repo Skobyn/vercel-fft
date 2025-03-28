@@ -1,6 +1,6 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CircleDollarSign, AlertTriangle } from "lucide-react";
+import { CircleDollarSign, AlertTriangle, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 export default function AuthError() {
@@ -8,10 +8,10 @@ export default function AuthError() {
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/40">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center space-y-2 mb-6">
-          <div className="p-2 bg-primary text-primary-foreground rounded-full">
-            <CircleDollarSign className="h-6 w-6" />
+          <div className="p-2 bg-green-600 text-white rounded-full">
+            <TrendingUp className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold">Financial Flow</h1>
+          <h1 className="text-2xl font-bold">Achievr</h1>
         </div>
 
         <Card>

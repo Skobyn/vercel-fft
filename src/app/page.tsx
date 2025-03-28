@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { CircleDollarSign, PiggyBank, LineChart, Calendar } from "lucide-react";
+import { TrendingUp, PiggyBank, LineChart, Calendar } from "lucide-react";
 
 // This is a Server Component - more efficient and reliable for the home page
 export default function Home() {
@@ -8,8 +8,10 @@ export default function Home() {
     <div className="flex flex-col min-h-[100vh]">
       <header className="px-4 lg:px-6 h-14 flex items-center">
         <Link className="flex items-center justify-center" href="/">
-          <CircleDollarSign className="h-6 w-6 mr-2" />
-          <span className="font-bold">Financial Flow</span>
+          <div className="p-1.5 bg-green-600 rounded-lg mr-2">
+            <TrendingUp className="h-5 w-5 text-white" />
+          </div>
+          <span className="font-bold">Achievr</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link className="text-sm font-medium hover:underline underline-offset-4" href="/features">
@@ -27,7 +29,7 @@ export default function Home() {
         </nav>
       </header>
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
+        <section className="w-full py-8 md:py-16 lg:py-20 xl:py-24">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
@@ -71,7 +73,7 @@ export default function Home() {
                     <p className="text-center text-muted-foreground">Never miss a payment deadline</p>
                   </div>
                   <div className="flex flex-col items-center space-y-2 rounded-lg border bg-background p-4">
-                    <CircleDollarSign className="h-10 w-10 text-primary" />
+                    <TrendingUp className="h-10 w-10 text-primary" />
                     <h3 className="text-xl font-bold">Bank Connectivity</h3>
                     <p className="text-center text-muted-foreground">Sync with your accounts securely</p>
                   </div>
@@ -80,19 +82,19 @@ export default function Home() {
             </div>
           </div>
         </section>
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+        <section className="w-full py-8 md:py-16 lg:py-20 bg-muted">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Features That Matter</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Financial Flow helps you manage your family finances with powerful features designed for everyday use.
+                  Achievr helps you manage your family finances with powerful features designed for everyday use.
                 </p>
               </div>
             </div>
             <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
               <div className="flex flex-col items-center space-y-2 rounded-lg border bg-background p-6">
-                <CircleDollarSign className="h-12 w-12 text-primary" />
+                <TrendingUp className="h-12 w-12 text-primary" />
                 <h3 className="text-xl font-bold">Bank Connectivity</h3>
                 <p className="text-center text-muted-foreground">
                   Connect securely to your bank accounts to automatically import transactions.
@@ -118,7 +120,7 @@ export default function Home() {
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full border-t px-4 md:px-6">
         <p className="text-center text-sm text-muted-foreground md:text-left">
-          &copy; {new Date().getFullYear()} Financial Flow. All rights reserved.
+          &copy; {new Date().getFullYear()} Achievr. All rights reserved.
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link className="text-sm font-medium hover:underline underline-offset-4" href="/terms">
