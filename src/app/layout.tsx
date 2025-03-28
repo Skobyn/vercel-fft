@@ -14,6 +14,15 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Achievr",
   description: "Track and manage your family's finances with Achievr",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/favicon.svg', sizes: 'any' }
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png' }
+    ]
+  }
 };
 
 export default function RootLayout({

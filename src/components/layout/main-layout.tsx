@@ -42,7 +42,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="flex-1 container px-4 md:px-6 pt-6">{children}</main>
       <footer className="border-t py-6 text-center text-sm text-muted-foreground">
         <div className="container">
-          <p>© {new Date().getFullYear()} Financial Flow. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Achievr. All rights reserved.</p>
         </div>
       </footer>
     </div>
