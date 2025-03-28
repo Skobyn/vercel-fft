@@ -19,7 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FinancialProfile } from "@/types/financial";
-import { formatCurrency } from "@/utils/financial-utils";
+import { formatCurrency } from "@/lib/utils";
 import BalanceForm from "@/components/forms/balance-form";
 import { useFinancialProfile } from "@/hooks/use-financial-data";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";

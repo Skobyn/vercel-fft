@@ -11,13 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const goalFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: z.string().optional(),
-  saved: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, {
+  currentAmount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, {
     message: "Must be a valid positive number",
   }),
   target: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Must be a valid positive number greater than 0",
   }),
-  type: z.enum(["adventure", "envelope", "balloon", "jar"]),
+  type: z.enum(["adventure", "envelope", "balloon", "jar"]).optional(),
+  targetDate: z.string().optional(),
 });
 
 type GoalFormValues = z.infer<typeof goalFormSchema>;
@@ -34,9 +35,10 @@ export function GoalForm({ onSubmit, onCancel, initialData }: GoalFormProps) {
     defaultValues: {
       name: initialData?.name || "",
       category: initialData?.category || "",
-      saved: initialData?.saved || "0",
+      currentAmount: initialData?.currentAmount || "0",
       target: initialData?.target || "",
       type: initialData?.type || "jar",
+      targetDate: initialData?.targetDate,
     },
     mode: "onChange",
   });
@@ -80,7 +82,7 @@ export function GoalForm({ onSubmit, onCancel, initialData }: GoalFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="saved"
+            name="currentAmount"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Current Savings</FormLabel>

@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FinancialProfile } from "@/types/financial";
-import { formatCurrency } from "@/utils/financial-utils";
+import { formatCurrency } from "@/lib/utils";
 
 const balanceFormSchema = z.object({
   newBalance: z.coerce

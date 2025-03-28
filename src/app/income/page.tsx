@@ -13,6 +13,7 @@ import { useIncomes } from "@/hooks/use-financial-data";
 import { IncomeList } from "@/components/dashboard/income-list";
 import { AddIncomeDialog } from "@/components/forms/add-income-dialog";
 import { MainLayout } from "@/components/layout/main-layout";
+import { Income } from "@/types/financial";
 
 export default function IncomePage() {
   const [loading, setLoading] = useState(true);

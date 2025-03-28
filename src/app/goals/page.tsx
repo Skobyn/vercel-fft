@@ -21,8 +21,10 @@ interface Goal {
   id: string;
   name: string;
   category?: string;
-  saved: number;
-  target: number;
+  currentAmount: number;
+  amount: number;
+  targetDate?: string;
+  isCompleted?: boolean;
   type?: "adventure" | "jar" | "envelope" | "balloon";
   checkpoints?: Array<{
     amount: number;
@@ -110,11 +112,10 @@ export default function GoalsPage() {
       await addGoal({
         name: data.name,
         category: data.category,
-        saved: parseFloat(data.saved) || 0,
-        target: parseFloat(data.target),
-        type: data.type || "jar",
-        checkpoints: data.checkpoints || [],
-        targetDate: data.targetDate
+        currentAmount: parseFloat(data.currentAmount) || 0,
+        amount: parseFloat(data.target),
+        targetDate: data.targetDate || new Date().toISOString(),
+        isCompleted: false
       });
       
       setFormOpen(false);
@@ -132,10 +133,8 @@ export default function GoalsPage() {
         id: editingGoal.id,
         name: data.name,
         category: data.category,
-        saved: parseFloat(data.saved) || 0,
-        target: parseFloat(data.target),
-        type: data.type || "jar",
-        checkpoints: data.checkpoints || []
+        currentAmount: parseFloat(data.currentAmount) || 0,
+        amount: parseFloat(data.target)
       });
       
       setFormOpen(false);
@@ -162,7 +161,7 @@ export default function GoalsPage() {
       
       await updateGoal({
         id,
-        saved: Math.min(goal.target, Math.max(0, goal.saved + amount))
+        currentAmount: Math.min(goal.amount, Math.max(0, goal.currentAmount + amount))
       });
       
       toast.success("Progress updated successfully");
@@ -178,9 +177,10 @@ export default function GoalsPage() {
       await addGoal({
         name: selectedGoal.name,
         category: selectedGoal.category,
-        saved: 0,
-        target: selectedGoal.target,
-        type: "jar"
+        currentAmount: 0,
+        amount: selectedGoal.target,
+        targetDate: new Date().toISOString(),
+        isCompleted: false
       });
       
       setSelectedGoal(null);
@@ -202,9 +202,10 @@ export default function GoalsPage() {
       await addGoal({
         name: customGoalName,
         category: "Other",
-        saved: 0,
-        target: parseFloat(customGoalAmount),
-        type: "jar"
+        currentAmount: 0,
+        amount: parseFloat(customGoalAmount),
+        targetDate: new Date().toISOString(),
+        isCompleted: false
       });
       
       setCustomGoalName("");
@@ -220,8 +221,8 @@ export default function GoalsPage() {
   // Filter goals based on completion status
   const filteredGoals = goals.filter(goal => {
     if (filter === "all") return true;
-    if (filter === "active") return goal.saved < goal.target;
-    if (filter === "completed") return goal.saved >= goal.target;
+    if (filter === "active") return goal.currentAmount < goal.amount;
+    if (filter === "completed") return goal.currentAmount >= goal.amount;
     return true;
   });
 
@@ -263,9 +264,10 @@ export default function GoalsPage() {
               initialData={editingGoal ? {
                 name: editingGoal.name,
                 category: editingGoal.category,
-                saved: editingGoal.saved.toString(),
-                target: editingGoal.target.toString(),
-                type: editingGoal.type as "adventure" | "jar" | "envelope" | "balloon"
+                currentAmount: editingGoal.currentAmount.toString(),
+                target: editingGoal.amount.toString(),
+                targetDate: editingGoal.targetDate,
+                type: visualizationType
               } : undefined}
             />
           </CardContent>
@@ -455,11 +457,10 @@ export default function GoalsPage() {
                   key={goal.id}
                   name={goal.name}
                   category={goal.category}
-                  saved={goal.saved}
-                  target={goal.target}
+                  saved={goal.currentAmount}
+                  target={goal.amount}
                   type={visualizationType}
                   icon={getCategoryIcon(goal.category)}
-                  checkpoints={goal.checkpoints}
                 />
               ))}
             </div>
