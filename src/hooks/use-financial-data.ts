@@ -5,9 +5,9 @@ import {
 } from '@/types/financial';
 import * as FinancialService from '@/services/financial-service';
 import { toast } from 'sonner';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, writeBatch, doc } from 'firebase/firestore';
 import { useCurrentHousehold } from '@/providers/household-provider';
-import { db } from '@/firebase/firebaseConfig';
+import { db } from '@/lib/firebase-client';
 
 // Helper to ensure user data is properly initialized
 const ensureUserDataInitialized = async (userId: string) => {

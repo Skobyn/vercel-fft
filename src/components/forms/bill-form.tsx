@@ -54,13 +54,14 @@ const billFormSchema = z.object({
   notes: z.string().optional(),
   endDate: z.date().optional(),
   account_id: z.string().optional(),
+  isRecurring: z.boolean().optional(),
 });
 
 type BillFormValues = z.infer<typeof billFormSchema>;
 
 interface BillFormProps {
   bill?: Bill;
-  onSubmit: (values: BillFormValues) => void;
+  onSubmit: (values: BillFormValues & { isRecurring: boolean }) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
@@ -87,6 +88,7 @@ export default function BillForm({
     notes: bill?.notes || "",
     endDate: bill?.endDate ? new Date(bill.endDate) : undefined,
     account_id: bill?.account_id || defaultAccount,
+    isRecurring: bill?.isRecurring,
   };
 
   const form = useForm<BillFormValues>({

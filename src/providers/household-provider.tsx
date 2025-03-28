@@ -92,7 +92,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
           throw new Error("Household not found");
         }
 
-        const householdData = householdDoc.data() as Household;
+        const householdData = householdDoc.data() as Omit<Household, 'id'>;
         setHousehold({ id: householdDoc.id, ...householdData });
 
         // Get all members of this household
@@ -126,7 +126,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       householdRef,
       (doc) => {
         if (doc.exists()) {
-          const data = doc.data() as Household;
+          const data = doc.data() as Omit<Household, 'id'>;
           setHousehold({ id: doc.id, ...data });
         }
       },
@@ -180,7 +180,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       const householdDoc = await getDoc(householdRef);
 
       if (householdDoc.exists()) {
-        const householdData = householdDoc.data() as Household;
+        const householdData = householdDoc.data() as Omit<Household, 'id'>;
         setHousehold({ id: householdDoc.id, ...householdData });
       }
 

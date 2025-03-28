@@ -1,3 +1,6 @@
+import { Timestamp, CollectionReference, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase-client';
+
 // Financial Account
 export interface FinancialAccount {
   id: string;
