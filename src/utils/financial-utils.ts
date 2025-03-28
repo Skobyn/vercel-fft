@@ -493,15 +493,22 @@ export function generateCashFlowForecast(
 /**
  * Formats a number as currency
  */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  if (isNaN(amount)) return '$0.00';
+export function formatCurrency(amount: number): string {
+  // Handle null, undefined, or NaN
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '$0.00';
+  }
   
+  // Round to exactly 2 decimal places
+  const roundedAmount = Math.round(amount * 100) / 100;
+  
+  // Format with US currency format and force 2 decimal places
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amount);
+  }).format(roundedAmount);
 }
 
 /**

@@ -60,7 +60,10 @@ export default function IncomePage() {
 
           <TabsContent value="all">
             <IncomeList 
-              incomes={incomes} 
+              incomes={incomes.filter((income, index, self) => 
+                // Filter out duplicates based on name
+                index === self.findIndex((i) => i.name === income.name)
+              )}
               onEdit={updateIncome} 
               onDelete={deleteIncome}
             />
@@ -68,10 +71,97 @@ export default function IncomePage() {
 
           <TabsContent value="upcoming">
             <IncomeList 
-              incomes={incomes.filter(income => 
-                new Date(income.date) > new Date() && 
-                !income.isRecurring
-              )} 
+              incomes={(() => {
+                const today = new Date();
+                const nextMonth = new Date();
+                nextMonth.setDate(today.getDate() + 30);
+                
+                // Array to store all occurrences
+                const occurrences: Income[] = [];
+                
+                // Process each income
+                incomes.forEach(income => {
+                  // If it's a one-time income and falls within the next 30 days, add it
+                  if (!income.isRecurring) {
+                    const incomeDate = new Date(income.date);
+                    if (incomeDate >= today && incomeDate <= nextMonth) {
+                      occurrences.push({...income});
+                    }
+                    return;
+                  }
+                  
+                  // For recurring income, generate all instances within the next 30 days
+                  const { frequency } = income;
+                  let currentDate = new Date(income.date);
+                  
+                  // If the date is in the past, calculate the next occurrence
+                  if (currentDate < today) {
+                    const daysElapsed = Math.floor((today.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (frequency === 'daily') {
+                      // Just use today
+                      currentDate = new Date(today);
+                    } else if (frequency === 'weekly') {
+                      const weeksElapsed = Math.ceil(daysElapsed / 7);
+                      const daysToAdd = weeksElapsed * 7;
+                      currentDate.setDate(currentDate.getDate() + daysToAdd);
+                    } else if (frequency === 'biweekly') {
+                      const biweeksElapsed = Math.ceil(daysElapsed / 14);
+                      const daysToAdd = biweeksElapsed * 14;
+                      currentDate.setDate(currentDate.getDate() + daysToAdd);
+                    } else if (frequency === 'monthly') {
+                      const monthsElapsed = Math.ceil(daysElapsed / 30);
+                      currentDate.setMonth(currentDate.getMonth() + monthsElapsed);
+                    } else if (frequency === 'quarterly') {
+                      const quartersElapsed = Math.ceil(daysElapsed / 90);
+                      currentDate.setMonth(currentDate.getMonth() + (quartersElapsed * 3));
+                    } else if (frequency === 'annually') {
+                      const yearsElapsed = Math.ceil(daysElapsed / 365);
+                      currentDate.setFullYear(currentDate.getFullYear() + yearsElapsed);
+                    }
+                  }
+                  
+                  // Generate occurrences for the next 30 days
+                  while (currentDate <= nextMonth) {
+                    if (currentDate >= today) {
+                      const occurrence = {
+                        ...income,
+                        id: `${income.id}-${currentDate.getTime()}`,
+                        date: currentDate.toISOString(),
+                        originalId: income.id, // Keep track of the original ID
+                      };
+                      occurrences.push(occurrence);
+                    }
+                    
+                    // Calculate next occurrence based on frequency
+                    if (frequency === 'daily') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setDate(currentDate.getDate() + 1);
+                    } else if (frequency === 'weekly') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setDate(currentDate.getDate() + 7);
+                    } else if (frequency === 'biweekly') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setDate(currentDate.getDate() + 14);
+                    } else if (frequency === 'monthly') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setMonth(currentDate.getMonth() + 1);
+                    } else if (frequency === 'quarterly') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setMonth(currentDate.getMonth() + 3);
+                    } else if (frequency === 'annually') {
+                      currentDate = new Date(currentDate);
+                      currentDate.setFullYear(currentDate.getFullYear() + 1);
+                    } else {
+                      // Skip if it's not a recognized frequency
+                      break;
+                    }
+                  }
+                });
+                
+                // Sort by date
+                return occurrences.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              })()}
               onEdit={updateIncome} 
               onDelete={deleteIncome}
             />

@@ -32,7 +32,6 @@ interface CashFlowChartProps {
 export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
   const financialData = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
-  const [timeframe, setTimeframe] = useState<string>("14");
   const [error, setError] = useState<string | null>(null);
   const [chartReady, setChartReady] = useState<boolean>(false);
   const [isGeneratingForecast, setIsGeneratingForecast] = useState<boolean>(false);
@@ -43,12 +42,12 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     balanceId: string | null;
     incomesCount: number;
     billsCount: number;
-    timeframe: string;
+    expensesCount: number;
   }>({
     balanceId: null,
     incomesCount: 0,
     billsCount: 0,
-    timeframe: "14"
+    expensesCount: 0
   });
   
   // Reset chart state when component unmounts
@@ -85,6 +84,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     const currentBalance = financialData.profileData?.currentBalance || 0;
     const incomesArray = financialData.incomesData || [];
     const billsArray = financialData.billsData || [];
+    const expensesArray = financialData.expensesData || [];
     const balanceId = `${currentBalance}-${financialData.profileData?.lastUpdated || ''}`;
     
     // Check if we need to regenerate the forecast
@@ -92,7 +92,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
       lastGenerationRef.current.balanceId !== balanceId ||
       lastGenerationRef.current.incomesCount !== incomesArray.length ||
       lastGenerationRef.current.billsCount !== billsArray.length ||
-      lastGenerationRef.current.timeframe !== timeframe;
+      lastGenerationRef.current.expensesCount !== expensesArray.length;
     
     // Skip generation if data is the same as before
     if (!shouldRegenerateForcecast && forecastData.length > 0) {
@@ -105,21 +105,18 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     setError(null);
     
     // Use client-side forecast generation for dashboard
-    // Fixed at 14 days max to avoid performance issues
+    // Fixed at 14 days for the dashboard
     const generateLocalForecast = () => {
       try {
-        const days = parseInt(timeframe);
-        // Enforce 14-day limit for the dashboard
-        const safeDays = Math.min(days, 14);
-        console.log(`Generating ${safeDays}-day forecast client-side`);
+        console.log(`Generating 14-day forecast client-side`);
         
         const forecast = generateCashFlowForecast(
           currentBalance,
           incomesArray,
           billsArray,
-          financialData.expensesData || [],
+          expensesArray,
           [], // No balance adjustments
-          safeDays
+          14 // Fixed at 14 days for dashboard
         );
         
         // Update the last generation reference
@@ -127,7 +124,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
           balanceId,
           incomesCount: incomesArray.length,
           billsCount: billsArray.length,
-          timeframe
+          expensesCount: expensesArray.length
         };
         
         // Set the forecast data in state
@@ -165,12 +162,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         timeoutRef.current = null;
       }
     };
-  }, [financialData, timeframe]);
-
-  const handleTimeframeChange = (value: string) => {
-    setTimeframe(value);
-    setChartReady(false);  // Reset chart ready state
-  };
+  }, [financialData]);
 
   // Show loading state if data is still loading
   if (financialData.loading || isGeneratingForecast || !chartReady) {
@@ -253,19 +245,8 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         <div className="flex justify-between items-center">
           <div>
             <CardTitle>Cash Flow Forecast</CardTitle>
-            <CardDescription>Projected balance over time</CardDescription>
+            <CardDescription>Projected balance over next 14 days</CardDescription>
           </div>
-          <Select onValueChange={handleTimeframeChange} defaultValue={timeframe}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="Timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="14">14 Days</SelectItem>
-              <SelectItem value="30">30 Days</SelectItem>
-              <SelectItem value="60">60 Days</SelectItem>
-              <SelectItem value="90">90 Days</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </CardHeader>
       <CardContent>
@@ -341,7 +322,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
         </div>
         
         <p className="text-xs text-muted-foreground mt-2">
-          Based on your current balance, income, and bills over the next {timeframe} days.
+          Based on your current balance, income, and bills over the next 14 days.
         </p>
       </CardContent>
     </Card>
