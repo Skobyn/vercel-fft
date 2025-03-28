@@ -290,14 +290,38 @@ export function BulkBillsEditor({ type, onSave, onCancel, existingItems = [] }: 
               isPaid,
               // Ensure date formats are valid or default to today
               dueDate: type === "bills" && row.dueDate ? 
-                // Fix for date import - ensure we preserve the exact date without timezone adjustment
-                new Date(new Date(row.dueDate).getTime() + (new Date(row.dueDate).getTimezoneOffset() * 60000))
-                  .toISOString().split('T')[0] 
+                // Parse and adjust date to avoid timezone issues
+                (() => {
+                  // First check if the date is in YYYY-MM-DD format
+                  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                  if (dateRegex.test(row.dueDate)) {
+                    // If it's already in YYYY-MM-DD format, don't adjust it
+                    return row.dueDate;
+                  } else {
+                    // Otherwise parse and adjust for timezone
+                    const date = new Date(row.dueDate);
+                    // Add a full day to compensate for timezone issues
+                    date.setDate(date.getDate() + 1);
+                    return date.toISOString().split('T')[0];
+                  }
+                })()
                 : format(new Date(), "yyyy-MM-dd"),
               date: type === "expenses" && row.date ? 
                 // Apply same fix for expense dates
-                new Date(new Date(row.date).getTime() + (new Date(row.date).getTimezoneOffset() * 60000))
-                  .toISOString().split('T')[0]
+                (() => {
+                  // First check if the date is in YYYY-MM-DD format
+                  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                  if (dateRegex.test(row.date)) {
+                    // If it's already in YYYY-MM-DD format, don't adjust it
+                    return row.date;
+                  } else {
+                    // Otherwise parse and adjust for timezone
+                    const date = new Date(row.date);
+                    // Add a full day to compensate for timezone issues
+                    date.setDate(date.getDate() + 1);
+                    return date.toISOString().split('T')[0];
+                  }
+                })()
                 : format(new Date(), "yyyy-MM-dd"),
             };
           });

@@ -25,6 +25,16 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
+    // Identify initial balance entry (if present)
+    let initialBalanceAmount = 0;
+    const filteredData = sortedData.filter(item => {
+      if (item.type === 'balance' && item.name === 'Current Balance') {
+        initialBalanceAmount = item.amount;
+        return false; // Remove initial balance entry from the dataset
+      }
+      return true;
+    });
+
     // Determine the interval based on timeFrame and data size
     let interval = 1; // days
     if (timeFrame === "1m") interval = 1; // daily for 1 month
@@ -39,8 +49,8 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
 
     // Create period boundaries with limited number of periods
     const maxPeriods = 20; // Maximum number of data points to show
-    const startDate = new Date(sortedData[0].date);
-    const endDate = new Date(sortedData[sortedData.length - 1].date);
+    const startDate = new Date(filteredData.length > 0 ? filteredData[0].date : new Date());
+    const endDate = new Date(filteredData.length > 0 ? filteredData[filteredData.length - 1].date : new Date());
     const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
     // Adjust interval if we would have too many periods
@@ -87,10 +97,10 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
     
     // Batch process data points to periods for better performance
     // For large datasets, only keep important transactions (high value or first/last)
-    const transactionLimit = 10; // Maximum transactions to store per period
+    const transactionLimit = 10;
     
     // Assign data points to periods
-    sortedData.forEach(item => {
+    filteredData.forEach(item => {
       const itemDate = new Date(item.date);
       
       // Find which period this item belongs to
@@ -126,7 +136,8 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
     const result = Object.values(groupedData);
     
     // Fill in missing running balances with the previous value
-    let lastBalance = baselineData[0]?.runningBalance || 0;
+    // Start with initial balance if we filtered it out
+    let lastBalance = initialBalanceAmount;
     for (let i = 0; i < result.length; i++) {
       if (result[i].runningBalance === null) {
         result[i].runningBalance = lastBalance;
@@ -134,72 +145,44 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
         lastBalance = result[i].runningBalance;
       }
     }
-    
-    // Process scenario data if available - using same approach for optimization
+
+    // Process scenario data if available
     if (scenarioData && scenarioData.length > 0) {
-      // Optimize for large scenario datasets
-      const sortedScenario = [...scenarioData].sort((a, b) => 
+      // Apply the same sorting and filtering logic to scenario data
+      const sortedScenarioData = [...scenarioData].sort((a, b) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
-      
-      // Pre-compute map for faster lookups
-      const periodMap = new Map(
-        periods.map(period => [period.label, period])
-      );
-      
-      // Create a map to accumulate scenario transactions by period
-      const scenarioTransactionsByPeriod = new Map<string, any[]>();
-      
-      // Assign scenario balance to periods - optimized approach
-      sortedScenario.forEach(item => {
+
+      // Extract initial balance
+      let scenarioInitialBalance = 0;
+      const filteredScenarioData = sortedScenarioData.filter(item => {
+        if (item.type === 'balance' && item.name === 'Current Balance') {
+          scenarioInitialBalance = item.amount;
+          return false;
+        }
+        return true;
+      });
+
+      // Process scenario data to periods
+      filteredScenarioData.forEach(item => {
         const itemDate = new Date(item.date);
         
-        // Find which period this item belongs to - more efficient loop
         for (const period of periods) {
           if (itemDate >= period.start && itemDate <= period.end) {
             const periodKey = period.label;
-            const periodIndex = result.findIndex(r => r.displayDate === periodKey);
+            const periodData = groupedData[periodKey];
             
-            if (periodIndex !== -1) {
-              // Store the last running balance for each period
-              if (item.runningBalance !== undefined) {
-                result[periodIndex].scenarioBalance = item.runningBalance;
-              }
-              
-              // Efficiently collect transactions with memory limits
-              if (!scenarioTransactionsByPeriod.has(periodKey)) {
-                scenarioTransactionsByPeriod.set(periodKey, []);
-              }
-              
-              const transactions = scenarioTransactionsByPeriod.get(periodKey)!;
-              if (transactions.length < transactionLimit) {
-                transactions.push({
-                  id: item.itemId || item.id,
-                  date: item.date,
-                  amount: item.amount,
-                  name: item.name,
-                  category: item.category,
-                  type: item.type,
-                  description: item.description
-                });
-              }
+            if (item.runningBalance !== undefined) {
+              periodData.scenarioBalance = item.runningBalance;
             }
             
-            break; // Exit the loop once we found the right period
+            break;
           }
         }
       });
       
-      // Assign collected transactions to result objects
-      for (const [periodKey, transactions] of scenarioTransactionsByPeriod.entries()) {
-        const periodIndex = result.findIndex(r => r.displayDate === periodKey);
-        if (periodIndex !== -1) {
-          result[periodIndex].scenarioTransactions = transactions;
-        }
-      }
-      
       // Fill in missing scenario balances
-      let lastScenarioBalance = scenarioData[0]?.runningBalance || 0;
+      let lastScenarioBalance = scenarioInitialBalance;
       for (let i = 0; i < result.length; i++) {
         if (result[i].scenarioBalance === undefined) {
           result[i].scenarioBalance = lastScenarioBalance;
@@ -258,36 +241,10 @@ export function ForecastChart({ baselineData, scenarioData, className, timeFrame
               </div>
             </>
           )}
-          
-          {periodData.scenarioTransactions && periodData.scenarioTransactions.length > 0 && (
-            <>
-              <div className="h-px w-full bg-border my-2" />
-              <p className="text-sm font-semibold text-emerald-500">Scenario Transactions:</p>
-              <div className="max-h-40 overflow-y-auto mt-1">
-                {periodData.scenarioTransactions.slice(0, 5).map((t: any, i: number) => (
-                  <div key={`scenario-${t.id || i}`} className="text-xs mb-1 py-1 border-b border-border/50">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{t.name}</span>
-                      <span className={t.amount >= 0 ? 'text-emerald-500' : 'text-rose-500'}>
-                        {t.amount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(t.amount))}
-                      </span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      {new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {t.category}
-                    </div>
-                  </div>
-                ))}
-                {periodData.scenarioTransactions.length > 5 && (
-                  <div className="text-xs text-muted-foreground text-center pt-1">
-                    + {periodData.scenarioTransactions.length - 5} more transactions
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </div>
       );
     }
+    
     return null;
   };
 
