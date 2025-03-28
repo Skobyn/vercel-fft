@@ -61,10 +61,7 @@ export default function IncomePage() {
 
           <TabsContent value="all">
             <IncomeList 
-              incomes={incomes.filter((income, index, self) => 
-                // Filter out duplicates based on name
-                index === self.findIndex((i) => i.name === income.name)
-              )}
+              incomes={incomes}
               onEdit={updateIncome} 
               onDelete={deleteIncome}
             />
@@ -105,19 +102,24 @@ export default function IncomePage() {
                     } else if (frequency === 'weekly') {
                       const weeksElapsed = Math.ceil(daysElapsed / 7);
                       const daysToAdd = weeksElapsed * 7;
+                      currentDate = new Date(currentDate);
                       currentDate.setDate(currentDate.getDate() + daysToAdd);
                     } else if (frequency === 'biweekly') {
                       const biweeksElapsed = Math.ceil(daysElapsed / 14);
                       const daysToAdd = biweeksElapsed * 14;
+                      currentDate = new Date(currentDate);
                       currentDate.setDate(currentDate.getDate() + daysToAdd);
                     } else if (frequency === 'monthly') {
                       const monthsElapsed = Math.ceil(daysElapsed / 30);
+                      currentDate = new Date(currentDate);
                       currentDate.setMonth(currentDate.getMonth() + monthsElapsed);
                     } else if (frequency === 'quarterly') {
                       const quartersElapsed = Math.ceil(daysElapsed / 90);
+                      currentDate = new Date(currentDate);
                       currentDate.setMonth(currentDate.getMonth() + (quartersElapsed * 3));
                     } else if (frequency === 'annually') {
                       const yearsElapsed = Math.ceil(daysElapsed / 365);
+                      currentDate = new Date(currentDate);
                       currentDate.setFullYear(currentDate.getFullYear() + yearsElapsed);
                     }
                   }
@@ -134,29 +136,28 @@ export default function IncomePage() {
                       occurrences.push(occurrence);
                     }
                     
+                    // Create a new date object for each iteration to avoid modifying the same reference
+                    const nextDate = new Date(currentDate);
+                    
                     // Calculate next occurrence based on frequency
                     if (frequency === 'daily') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setDate(currentDate.getDate() + 1);
+                      nextDate.setDate(nextDate.getDate() + 1);
                     } else if (frequency === 'weekly') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setDate(currentDate.getDate() + 7);
+                      nextDate.setDate(nextDate.getDate() + 7);
                     } else if (frequency === 'biweekly') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setDate(currentDate.getDate() + 14);
+                      nextDate.setDate(nextDate.getDate() + 14);
                     } else if (frequency === 'monthly') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setMonth(currentDate.getMonth() + 1);
+                      nextDate.setMonth(nextDate.getMonth() + 1);
                     } else if (frequency === 'quarterly') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setMonth(currentDate.getMonth() + 3);
+                      nextDate.setMonth(nextDate.getMonth() + 3);
                     } else if (frequency === 'annually') {
-                      currentDate = new Date(currentDate);
-                      currentDate.setFullYear(currentDate.getFullYear() + 1);
+                      nextDate.setFullYear(nextDate.getFullYear() + 1);
                     } else {
                       // Skip if it's not a recognized frequency
                       break;
                     }
+                    
+                    currentDate = nextDate;
                   }
                 });
                 

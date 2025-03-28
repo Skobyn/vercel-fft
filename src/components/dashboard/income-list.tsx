@@ -270,7 +270,7 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
       <CardHeader>
         <CardTitle>Expected Income</CardTitle>
         <CardDescription>
-          Expected in the next 30 days
+          {upcomingIncomes.length > 0 ? `${upcomingIncomes.length} income entries in the next 30 days` : "No upcoming income"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -282,26 +282,32 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
               Add your income sources to track your cash flow
             </p>
           </div>
-        ) : upcomingIncomes.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            <Calendar className="mx-auto h-12 w-12 opacity-20 mb-2" />
-            <p>No income expected in the next 30 days</p>
-            <p className="text-xs mt-1">You have {incomes.length} income sources configured</p>
-          </div>
         ) : (
           <div className="space-y-4">
-            {upcomingIncomes.map((income) => (
+            {(upcomingIncomes.length > 0 ? upcomingIncomes : incomes).map((income) => (
               <div
                 key={income.id}
                 className="flex items-center justify-between border-b last:border-b-0 pb-3 last:pb-0"
               >
                 <div className="space-y-1">
-                  <div className="font-medium">{income.name}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {income.name}
+                    {income.isRecurring && (
+                      <Badge variant="outline" className="text-xs">
+                        {FREQUENCY_LABEL[income.frequency] || 'Recurring'}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>
-                      Expected {format(parseISO(income.date), "MMM d, yyyy")}
-                      {isComingSoon(income.date) && (
+                      {income.isRecurring 
+                        ? `Next: ${format(parseISO(income.date), "MMM d, yyyy")}` 
+                        : `${format(parseISO(income.date), "MMM d, yyyy")}`}
+                      {isComingSoon(income.date) && !isPast(income.date) && (
                         <Badge variant="outline" className="ml-2 text-xs">Soon</Badge>
+                      )}
+                      {isPast(income.date) && !income.isRecurring && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-muted">Past</Badge>
                       )}
                     </span>
                   </div>
@@ -330,14 +336,6 @@ export function IncomeList({ incomes, onEdit, onDelete, loading, error }: Income
                 </div>
               </div>
             ))}
-            
-            {incomes.length > upcomingIncomes.length && (
-              <div className="pt-2 text-center">
-                <Button variant="link" size="sm" asChild>
-                  <a href="/income">View all income sources</a>
-                </Button>
-              </div>
-            )}
           </div>
         )}
       </CardContent>
