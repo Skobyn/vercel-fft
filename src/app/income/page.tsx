@@ -43,7 +43,7 @@ export default function IncomePage() {
 
   return (
     <MainLayout>
-      <div className="container py-10">
+      <div className="py-10">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Income</h1>
           <Button onClick={() => setAddDialogOpen(true)}>

@@ -275,7 +275,7 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      <div className="p-4 md:p-6">
+      <div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Financial Dashboard</h1>
           
