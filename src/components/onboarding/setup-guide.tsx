@@ -45,11 +45,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/providers/firebase-auth-provider';
-import { useFinancialData } from '@/hooks/use-financial-data';
+import { useFinancialData, useAccounts } from '@/hooks/use-financial-data';
 import AddIncomeForm from '../forms/add-income-form';
 import AddExpenseForm from '../forms/add-expense-form';
 import UpdateBalanceForm from '../forms/update-balance-form';
 import { addBill } from '@/services/financial-service';
+import { AccountForm } from '../forms/account-form';
 
 interface SetupGuideProps {
   onClose?: () => void;
@@ -69,18 +70,26 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
   const { user } = useAuth();
   const { profile, loading: profileLoading, updateBalance } = useFinancialProfile();
   const { updateFinancialBalance, addIncome, addExpense } = useFinancialData();
+  const { addAccount } = useAccounts();
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false);
   const [balanceAmount, setBalanceAmount] = useState<string>("");
   const router = useRouter();
   
   // Setup state for active step
-  const [activeStep, setActiveStep] = useState<string>("balance");
+  const [activeStep, setActiveStep] = useState<string>("accounts");
   const [steps, setSteps] = useState<Step[]>([
+    {
+      id: "accounts",
+      title: "Set Up Your Accounts",
+      description: "Add your bank, credit, and other financial accounts",
+      isCompleted: false,
+      icon: <PiggyBank className="h-5 w-5" />,
+    },
     {
       id: "balance",
       title: "Set Your Current Balance",
-      description: "Start by setting your current account balance",
+      description: "Update the balance for your primary account",
       isCompleted: false,
       icon: <Wallet className="h-5 w-5" />,
     },
@@ -230,6 +239,36 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
     }
   };
 
+  // Handle account setup
+  const handleAccountSetup = async (accountData: any) => {
+    if (!user) return;
+    
+    try {
+      console.log("Setting up new account:", accountData);
+      
+      // Add the account
+      const newAccount = await addAccount({
+        ...accountData,
+        is_default: true, // Make this the default account
+      });
+      
+      if (newAccount) {
+        // Mark this step as completed
+        markStepComplete("accounts");
+        
+        // Move to next step
+        setActiveStep("balance");
+        
+        toast.success(`${accountData.name} has been added as your primary account`);
+      } else {
+        throw new Error("Failed to create account");
+      }
+    } catch (error) {
+      console.error('Error setting up account:', error);
+      toast.error("Failed to set up account. Please try again.");
+    }
+  };
+
   // Calculate progress
   const totalSteps = steps.length;
   const completedCount = steps.filter(step => step.isCompleted).length;
@@ -238,6 +277,16 @@ export function SetupGuide({ onClose, onSetBalance }: SetupGuideProps) {
   // Render form based on active step
   const renderActiveStepForm = () => {
     switch (activeStep) {
+      case "accounts":
+        return (
+          <div className="p-4">
+            <h3 className="text-lg font-medium mb-4">Add Your Primary Account</h3>
+            <AccountForm 
+              onSubmit={handleAccountSetup}
+              isSubmitting={false}
+            />
+          </div>
+        );
       case "balance":
         return <UpdateBalanceForm onUpdate={handleBalanceUpdate} initialBalance={profile?.currentBalance} />;
       case "income":
