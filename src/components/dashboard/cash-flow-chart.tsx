@@ -106,7 +106,7 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
           // Use the account balance as starting balance
           const startingBalance = currentBalance;
           
-          const forecast = generateCashFlowForecast({
+          const forecast = generateForecast({
             startDate: new Date(),
             days: days,
             startingBalance: startingBalance,
