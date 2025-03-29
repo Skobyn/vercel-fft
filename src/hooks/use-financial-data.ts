@@ -5,7 +5,7 @@ import {
 } from '@/types/financial';
 import * as FinancialService from '@/services/financial-service';
 import { toast } from 'sonner';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, writeBatch, doc, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useCurrentHousehold } from '@/providers/household-provider';
 import { db } from '@/lib/firebase-client';
 
@@ -1008,196 +1008,176 @@ export function useFinancialData() {
  * Automatically handles setting the default account and manages active accounts
  */
 export function useAccounts() {
-  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const { user } = useAuth();
-  const { household } = useCurrentHousehold();
+  const user = useAuth();
+  const [state, setState] = useState<{
+    accounts: FinancialAccount[];
+    loading: boolean;
+    error: Error | null;
+  }>({
+    accounts: [],
+    loading: true,
+    error: null
+  });
 
-  useEffect(() => {
-    async function fetchAccounts() {
-      if (!user || !household) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const accountsRef = collection(
-          db, 
-          `households/${household.id}/financial_accounts`
-        );
-        const q = query(accountsRef, where("is_active", "==", true));
-        const snapshot = await getDocs(q);
-        
-        const accountsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as FinancialAccount[];
-        
-        setAccounts(accountsData);
-      } catch (err) {
-        console.error("Error fetching accounts:", err);
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setLoading(false);
-      }
+  // Helper function to get household
+  const getHousehold = useCallback(async () => {
+    if (!user) {
+      throw new Error("User not authenticated");
     }
-
-    fetchAccounts();
-  }, [user, household]);
-
-  const refreshAccounts = useCallback(async () => {
-    if (!user || !household) return;
     
-    try {
-      setLoading(true);
-      
-      const accountsRef = collection(
-        db, 
-        `households/${household.id}/financial_accounts`
-      );
-      const q = query(accountsRef, where("is_active", "==", true));
-      const snapshot = await getDocs(q);
-      
-      const accountsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as FinancialAccount[];
-      
-      setAccounts(accountsData);
-      setError(null);
-    } catch (err) {
-      console.error("Error refreshing accounts:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setLoading(false);
-    }
-  }, [user, household]);
-
-  const addAccount = useCallback(async (accountData: Omit<FinancialAccount, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    if (!user || !household) return null;
+    const householdQuery = query(
+      collection(db, "household_members"),
+      where("profile_id", "==", user.uid)
+    );
     
-    try {
-      setLoading(true);
-      
-      const now = new Date().toISOString();
-      const newAccount = {
-        ...accountData,
-        userId: user.uid,
-        householdId: household.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      
-      // If this is marked as default, update other accounts to not be default
-      if (accountData.is_default) {
-        const accountsRef = collection(db, `households/${household.id}/financial_accounts`);
-        const q = query(accountsRef, where("is_default", "==", true));
-        const snapshot = await getDocs(q);
-        
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(doc => {
-          batch.update(doc.ref, { is_default: false });
-        });
-        
-        await batch.commit();
-      }
-      
-      const docRef = await addDoc(
-        collection(db, `households/${household.id}/financial_accounts`),
-        newAccount
-      );
-      
-      const addedAccount = { id: docRef.id, ...newAccount } as FinancialAccount;
-      setAccounts(prev => [...prev, addedAccount]);
-      
-      return addedAccount;
-    } catch (err) {
-      console.error("Error adding account:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, household]);
-
-  const updateAccount = useCallback(async (id: string, accountData: Partial<FinancialAccount>) => {
-    if (!user || !household) return false;
+    const householdSnapshot = await getDocs(householdQuery);
     
-    try {
-      setLoading(true);
-      
-      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
-      
-      // If this account is being marked as default, update other accounts
-      if (accountData.is_default) {
-        const accountsRef = collection(db, `households/${household.id}/financial_accounts`);
-        const q = query(accountsRef, where("is_default", "==", true));
-        const snapshot = await getDocs(q);
-        
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(doc => {
-          if (doc.id !== id) {
-            batch.update(doc.ref, { is_default: false });
-          }
-        });
-        
-        await batch.commit();
-      }
-      
-      await updateDoc(accountRef, {
-        ...accountData,
-        updatedAt: new Date().toISOString(),
+    if (householdSnapshot.empty) {
+      console.log("Creating new household for user");
+      // Create a new household
+      const householdRef = await addDoc(collection(db, "households"), {
+        name: "My Household",
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        created_by: user.uid
       });
       
-      // Update local state
-      setAccounts(prev => 
-        prev.map(account => account.id === id 
-          ? { ...account, ...accountData, updatedAt: new Date().toISOString() } 
-          : accountData.is_default ? { ...account, is_default: false } : account
-        )
+      const householdId = householdRef.id;
+      
+      // Create household membership
+      await addDoc(collection(db, "household_members"), {
+        household_id: householdId,
+        profile_id: user.uid,
+        role: "owner",
+        created_at: serverTimestamp()
+      });
+      
+      return { id: householdId };
+    } else {
+      const householdId = householdSnapshot.docs[0].data().household_id;
+      return { id: householdId };
+    }
+  }, [user]);
+
+  async function fetchAccounts() {
+    if (!user) {
+      setState(prev => ({ ...prev, accounts: [], loading: false }));
+      return;
+    }
+
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+      
+      const household = await getHousehold();
+      
+      console.log(`Fetching accounts from households/${household.id}/financial_accounts`);
+      
+      const accountsQuery = query(
+        collection(db, `households/${household.id}/financial_accounts`),
+        orderBy("name", "asc")
       );
       
-      return true;
-    } catch (err) {
-      console.error("Error updating account:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      return false;
-    } finally {
-      setLoading(false);
+      const accountsSnapshot = await getDocs(accountsQuery);
+      
+      const accounts = accountsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as FinancialAccount[];
+
+      setState({
+        accounts,
+        loading: false,
+        error: null
+      });
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error : new Error('Failed to fetch accounts')
+      }));
     }
-  }, [user, household]);
+  }
+
+  const addAccount = useCallback(async (account: Omit<FinancialAccount, 'id'>) => {
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    try {
+      const household = await getHousehold();
+      
+      const accountsRef = collection(db, `households/${household.id}/financial_accounts`);
+      
+      const docRef = await addDoc(accountsRef, {
+        ...account,
+        userId: user.uid,
+        householdId: household.id,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
+
+      // Refresh accounts
+      fetchAccounts();
+      
+      return docRef.id;
+    } catch (error) {
+      console.error("Error adding account:", error);
+      throw error;
+    }
+  }, [user, getHousehold]);
+
+  const updateAccount = useCallback(async (id: string, data: Partial<FinancialAccount>) => {
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    try {
+      const household = await getHousehold();
+      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
+      
+      await updateDoc(accountRef, {
+        ...data,
+        updated_at: serverTimestamp(),
+      });
+
+      // Refresh accounts
+      fetchAccounts();
+    } catch (error) {
+      console.error("Error updating account:", error);
+      throw error;
+    }
+  }, [user, getHousehold]);
 
   const deleteAccount = useCallback(async (id: string) => {
-    if (!user || !household) return false;
-    
-    try {
-      setLoading(true);
-      
-      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
-      await deleteDoc(accountRef);
-      
-      // Update local state
-      setAccounts(prev => prev.filter(account => account.id !== id));
-      
-      return true;
-    } catch (err) {
-      console.error("Error deleting account:", err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-      return false;
-    } finally {
-      setLoading(false);
+    if (!user) {
+      throw new Error("User not authenticated");
     }
-  }, [user, household]);
+
+    try {
+      const household = await getHousehold();
+      const accountRef = doc(db, `households/${household.id}/financial_accounts`, id);
+      
+      await deleteDoc(accountRef);
+
+      // Refresh accounts
+      fetchAccounts();
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  }, [user, getHousehold]);
+
+  // Fetch accounts when user changes
+  useEffect(() => {
+    fetchAccounts();
+  }, [user]);
 
   return {
-    accounts,
-    loading,
-    error,
-    refreshAccounts,
+    accounts: state.accounts,
+    loading: state.loading,
+    error: state.error,
+    fetchAccounts,
     addAccount,
     updateAccount,
     deleteAccount

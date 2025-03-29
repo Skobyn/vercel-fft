@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { CalendarIcon, TrendingDown, TrendingUp, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
+import { CalendarIcon, TrendingDown, TrendingUp, AlertCircle, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,22 +20,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useFinancialData } from "@/hooks/use-financial-data";
+import { useFinancialData, useAccounts } from "@/hooks/use-financial-data";
 import { ForecastItem } from "@/types/financial";
 import { formatCurrency, formatDate, generateCashFlowForecast } from "@/utils/financial-utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format, addDays, isBefore, isAfter, parseISO } from "date-fns";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { generateForecast } from "@/lib/forecast";
+import { Transaction } from "@/types/transaction";
 
 interface CashFlowChartProps {
   days?: number;
 }
 
 export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
-  const financialData = useFinancialData();
   const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [chartReady, setChartReady] = useState<boolean>(false);
   const [isGeneratingForecast, setIsGeneratingForecast] = useState<boolean>(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectedTab, setSelectedTab] = useState("all");
+  const [isLoading, setIsLoading] = useState(true);
+  const financialData = useFinancialData();
+  const { accounts, loading: accountsLoading } = useAccounts();
   
   // Use ref to track last successful generation to prevent infinite loops
   const lastGenerationRef = useRef<{
@@ -59,110 +71,72 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     };
   }, []);
   
+  // Get total account balance
+  const currentBalance = useMemo(() => {
+    if (!accounts || accounts.length === 0) {
+      // If no accounts, use profile balance
+      return financialData.profile?.currentBalance || 0;
+    }
+    
+    // Sum up all account balances
+    return accounts.reduce((total, account) => {
+      return total + (account.balance || 0);
+    }, 0);
+  }, [accounts, financialData.profile]);
+  
   // Effect for generating forecast with safeguards
   useEffect(() => {
-    // Clear previous timeout if it exists
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    
-    // Don't do anything if still loading
-    if (financialData.loading) {
-      setChartReady(false);
-      return;
-    }
-    
-    // Guard clause to prevent unnecessary processing
-    if (!financialData.profileData) {
-      setError("Financial profile data not available");
-      setChartReady(true);
-      return;
-    }
-    
-    // Get current state for reference
-    const currentBalance = financialData.profileData?.currentBalance || 0;
-    const incomesArray = financialData.incomesData || [];
-    const billsArray = financialData.billsData || [];
-    const expensesArray = financialData.expensesData || [];
-    const balanceId = `${currentBalance}-${financialData.profileData?.lastUpdated || ''}`;
-    
-    // Check if we need to regenerate the forecast
-    const shouldRegenerateForcecast = 
-      lastGenerationRef.current.balanceId !== balanceId ||
-      lastGenerationRef.current.incomesCount !== incomesArray.length ||
-      lastGenerationRef.current.billsCount !== billsArray.length ||
-      lastGenerationRef.current.expensesCount !== expensesArray.length;
-    
-    // Skip generation if data is the same as before
-    if (!shouldRegenerateForcecast && forecastData.length > 0) {
-      setChartReady(true);
-      return;
-    }
-    
-    // Set state to indicate forecast generation is in progress
-    setIsGeneratingForecast(true);
-    setError(null);
-    
-    // Use client-side forecast generation for dashboard
-    // Using the days prop from component properties
-    const generateLocalForecast = () => {
-      try {
-        console.log(`Generating ${days}-day forecast client-side`);
-        
-        const forecast = generateCashFlowForecast(
-          currentBalance,
-          incomesArray,
-          billsArray,
-          expensesArray,
-          [], // No balance adjustments
-          days // Use the days prop passed to the component
-        );
-        
-        // Update the last generation reference
-        lastGenerationRef.current = {
-          balanceId,
-          incomesCount: incomesArray.length,
-          billsCount: billsArray.length,
-          expensesCount: expensesArray.length
-        };
-        
-        // Set the forecast data in state
-        setForecastData(forecast);
-        console.log(`Generated ${forecast.length} forecast items successfully`);
-      } catch (error) {
-        console.error("Error generating cash flow forecast:", error);
-        setError(error instanceof Error ? error.message : "Unable to generate forecast");
-        // Provide default data to prevent rendering issues
-        setForecastData([{
-          itemId: 'initial-balance',
-          date: new Date().toISOString(),
-          amount: financialData.profileData?.currentBalance ?? 0,
-          category: 'balance',
-          name: 'Current Balance',
-          type: 'balance',
-          runningBalance: financialData.profileData?.currentBalance ?? 0
-        }]);
-      } finally {
-        setIsGeneratingForecast(false);
-        setChartReady(true);
+    if (
+      !financialData.loading && 
+      !accountsLoading && 
+      !isGeneratingForecast
+    ) {
+      setIsGeneratingForecast(true);
+      
+      console.log(`Generating ${days}-day forecast client-side`);
+      
+      // Clear previous timeout if it exists
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-    };
+      
+      // Generate forecast with a slight delay to avoid blocking the UI
+      timeoutRef.current = setTimeout(() => {
+        try {
+          // Use the account balance as starting balance
+          const startingBalance = currentBalance;
+          
+          const forecast = generateCashFlowForecast({
+            startDate: new Date(),
+            days: days,
+            startingBalance: startingBalance,
+            incomes: financialData.incomes || [],
+            bills: financialData.bills || [],
+            expenses: financialData.expenses || []
+          });
+          
+          console.log(`Generated forecast with ${forecast.length} items`);
+          
+          setForecastData(forecast);
+          setChartReady(true);
+          setError(null);
+        } catch (err) {
+          console.error('Error generating forecast:', err);
+          setError('Failed to generate forecast. Please try again later.');
+        } finally {
+          setIsGeneratingForecast(false);
+        }
+      }, 300);
+    }
     
-    // Add a slight delay to prevent too many requests during rapid changes
-    timeoutRef.current = setTimeout(() => {
-      generateLocalForecast();
-      timeoutRef.current = null;
-    }, 300);
-    
-    // Cleanup function
+    // Cleanup timeout on unmount
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
       }
     };
-  }, [financialData, days]);
+  }, [financialData.loading, financialData.incomes, financialData.bills, 
+      financialData.expenses, days, isGeneratingForecast, currentBalance, accountsLoading]);
 
   // Show loading state if data is still loading
   if (financialData.loading || isGeneratingForecast || !chartReady) {
