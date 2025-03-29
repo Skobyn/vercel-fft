@@ -90,10 +90,9 @@ export default function AccountsPage() {
       
       const householdId = householdSnapshot.docs[0].data().household_id;
       
-      // Then get accounts in that household
+      // Then get accounts in that household using the nested collection path
       const accountsQuery = query(
-        collection(db, "financial_accounts"),
-        where("household_id", "==", householdId),
+        collection(db, `households/${householdId}/financial_accounts`),
         orderBy("name")
       );
       
@@ -114,7 +113,60 @@ export default function AccountsPage() {
   };
 
   const handleAddAccount = async (data: Omit<Account, 'id'>) => {
-    if (!user) return;
+    if (!user) {
+      console.error("Cannot add account: User not authenticated");
+      toast.error("You must be logged in to add an account");
+      return;
+    }
+    
+    try {
+      console.log("Starting account creation process...");
+      
+      // Get the user's household ID first
+      const householdQuery = query(
+        collection(db, "household_members"), 
+        where("profile_id", "==", user.uid)
+      );
+      
+      console.log("Fetching household for user:", user.uid);
+      const householdSnapshot = await getDocs(householdQuery);
+      
+      if (householdSnapshot.empty) {
+        console.error("No household found for user", user.uid);
+        toast.error("No household found for this user");
+        return;
+      }
+      
+      const householdId = householdSnapshot.docs[0].data().household_id;
+      console.log("Found household ID:", householdId);
+
+      // Prepare the account data
+      const accountData = {
+        ...data,
+        userId: user.uid,
+        householdId: householdId,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      };
+      
+      console.log("Saving account data:", accountData);
+      console.log("To collection path:", `households/${householdId}/financial_accounts`);
+
+      // Add the new account using the nested collection path
+      const docRef = await addDoc(collection(db, `households/${householdId}/financial_accounts`), accountData);
+      
+      console.log("Account created successfully with ID:", docRef.id);
+      toast.success("Account added successfully");
+      setIsAddDialogOpen(false);
+      fetchAccounts();
+    } catch (error) {
+      console.error("Error adding account:", error);
+      toast.error("Failed to add account: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
+  const handleEditAccount = async (data: Omit<Account, 'id'>) => {
+    if (!user || !selectedAccount) return;
     
     try {
       // Get the user's household ID first
@@ -131,29 +183,9 @@ export default function AccountsPage() {
       }
       
       const householdId = householdSnapshot.docs[0].data().household_id;
-
-      // Add the new account
-      await addDoc(collection(db, "financial_accounts"), {
-        ...data,
-        household_id: householdId,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-      });
       
-      toast.success("Account added successfully");
-      setIsAddDialogOpen(false);
-      fetchAccounts();
-    } catch (error) {
-      console.error("Error adding account:", error);
-      toast.error("Failed to add account");
-    }
-  };
-
-  const handleEditAccount = async (data: Omit<Account, 'id'>) => {
-    if (!user || !selectedAccount) return;
-    
-    try {
-      const accountRef = doc(db, "financial_accounts", selectedAccount.id);
+      // Use the nested collection path
+      const accountRef = doc(db, `households/${householdId}/financial_accounts`, selectedAccount.id);
       
       await updateDoc(accountRef, {
         ...data,
@@ -173,7 +205,23 @@ export default function AccountsPage() {
     if (!user || !selectedAccount) return;
     
     try {
-      const accountRef = doc(db, "financial_accounts", selectedAccount.id);
+      // Get the user's household ID first
+      const householdQuery = query(
+        collection(db, "household_members"), 
+        where("profile_id", "==", user.uid)
+      );
+      
+      const householdSnapshot = await getDocs(householdQuery);
+      
+      if (householdSnapshot.empty) {
+        toast.error("No household found for this user");
+        return;
+      }
+      
+      const householdId = householdSnapshot.docs[0].data().household_id;
+      
+      // Use the nested collection path
+      const accountRef = doc(db, `households/${householdId}/financial_accounts`, selectedAccount.id);
       
       await deleteDoc(accountRef);
       
