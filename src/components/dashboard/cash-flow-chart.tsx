@@ -32,7 +32,6 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { generateForecast } from "@/lib/forecast";
-import { Transaction } from "@/types/transaction";
 
 interface CashFlowChartProps {
   days?: number;
