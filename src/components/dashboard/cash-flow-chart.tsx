@@ -73,15 +73,15 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
   // Get total account balance
   const currentBalance = useMemo(() => {
     if (!accounts || accounts.length === 0) {
-      // If no accounts, use profile balance
-      return financialData.profile?.currentBalance || 0;
+      // If no accounts, use profile balance - check if profile exists
+      return financialData.profileData?.currentBalance || 0;
     }
     
     // Sum up all account balances
     return accounts.reduce((total, account) => {
       return total + (account.balance || 0);
     }, 0);
-  }, [accounts, financialData.profile]);
+  }, [accounts, financialData.profileData]);
   
   // Effect for generating forecast with safeguards
   useEffect(() => {
@@ -109,9 +109,9 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
             startDate: new Date(),
             days: days,
             startingBalance: startingBalance,
-            incomes: financialData.incomes || [],
-            bills: financialData.bills || [],
-            expenses: financialData.expenses || []
+            incomes: financialData.incomes?.incomes || [], // Access the inner array
+            bills: financialData.bills?.bills || [], // Access the inner array
+            expenses: financialData.expenses?.expenses || [] // Access the inner array
           });
           
           console.log(`Generated forecast with ${forecast.length} items`);
@@ -185,8 +185,8 @@ export function CashFlowChart({ days = 14 }: CashFlowChartProps) {
     );
   }
 
-  // Safe access to data
-  const startingBalance = financialData.profileData.currentBalance || 0;
+  // Safe access to data - ensure nested profile exists
+  const startingBalance = financialData.profileData?.currentBalance || 0;
   const endBalance = forecastData.length > 0 
     ? (forecastData[forecastData.length - 1].runningBalance || startingBalance) 
     : startingBalance;

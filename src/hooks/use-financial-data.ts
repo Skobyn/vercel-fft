@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@/providers/firebase-auth-provider';
+import { useAuth, User as AuthUser } from '@/providers/firebase-auth-provider';
 import {
   Income, Bill, Expense, Budget, Goal, FinancialProfile, FinancialAccount
 } from '@/types/financial';
@@ -1008,7 +1008,7 @@ export function useFinancialData() {
  * Automatically handles setting the default account and manages active accounts
  */
 export function useAccounts() {
-  const user = useAuth();
+  const { user } = useAuth();
   const [state, setState] = useState<{
     accounts: FinancialAccount[];
     loading: boolean;
@@ -1024,10 +1024,13 @@ export function useAccounts() {
     if (!user) {
       throw new Error("User not authenticated");
     }
+
+    // Access user.uid - user is of type User from firebase-auth-provider
+    const userId = user.uid; // This should now be properly typed
     
     const householdQuery = query(
       collection(db, "household_members"),
-      where("profile_id", "==", user.uid)
+      where("profile_id", "==", userId)
     );
     
     const householdSnapshot = await getDocs(householdQuery);
@@ -1039,7 +1042,7 @@ export function useAccounts() {
         name: "My Household",
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
-        created_by: user.uid
+        created_by: userId
       });
       
       const householdId = householdRef.id;
@@ -1047,7 +1050,7 @@ export function useAccounts() {
       // Create household membership
       await addDoc(collection(db, "household_members"), {
         household_id: householdId,
-        profile_id: user.uid,
+        profile_id: userId,
         role: "owner",
         created_at: serverTimestamp()
       });
