@@ -276,14 +276,26 @@ export default function AccountsPage() {
                 Add Account
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent onPointerDownOutside={(e) => {
+              // Prevent closing when clicking inside the form
+              console.log("Dialog pointer down outside event");
+              if (e.target && (e.target as HTMLElement).closest('form')) {
+                e.preventDefault();
+              }
+            }}>
               <DialogHeader>
                 <DialogTitle>Add New Account</DialogTitle>
                 <DialogDescription>
                   Add a new financial account to track your money
                 </DialogDescription>
               </DialogHeader>
-              <AccountForm onSubmit={handleAddAccount} onCancel={() => setIsAddDialogOpen(false)} />
+              <AccountForm 
+                onSubmit={(values) => {
+                  console.log("AccountForm onSubmit callback triggered with:", values);
+                  handleAddAccount(values);
+                }} 
+                onCancel={() => setIsAddDialogOpen(false)} 
+              />
             </DialogContent>
           </Dialog>
         </div>

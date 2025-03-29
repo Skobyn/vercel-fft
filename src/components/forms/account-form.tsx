@@ -97,10 +97,16 @@ export function AccountForm({
 
   // Handle form submission
   const handleSubmit = (values: AccountFormValues) => {
-    onSubmit({
-      ...values,
-      balance: values.balance || 0,
-    });
+    console.log("Form submission triggered with values:", values);
+    try {
+      onSubmit({
+        ...values,
+        balance: values.balance || 0,
+      });
+      console.log("onSubmit handler called successfully");
+    } catch (error) {
+      console.error("Error in form submission handler:", error);
+    }
   };
   
   // Get current formatted balance for display
@@ -108,7 +114,13 @@ export function AccountForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form 
+        onSubmit={(e) => {
+          console.log("Form submit event triggered");
+          form.handleSubmit(handleSubmit)(e);
+        }} 
+        className="space-y-6"
+      >
         <div className="grid gap-4">
           <FormField
             control={form.control}
@@ -281,7 +293,11 @@ export function AccountForm({
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting}
+            onClick={() => console.log("Submit button clicked, form state:", form.getValues(), "Form valid:", form.formState.isValid)}
+          >
             {isSubmitting
               ? "Saving..."
               : account
