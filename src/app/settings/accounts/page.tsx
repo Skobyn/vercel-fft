@@ -46,6 +46,8 @@ interface Account {
   is_default?: boolean;
 }
 
+// Page component for account management
+// Fixed for Vercel deployment - April 2023
 export default function AccountsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -82,13 +84,36 @@ export default function AccountsPage() {
       
       const householdSnapshot = await getDocs(householdQuery);
       
+      let householdId: string;
+      
       if (householdSnapshot.empty) {
-        toast.error("No household found for this user");
+        console.log("No household found when fetching accounts, creating a new household");
+        
+        // Create a new household
+        const householdRef = await addDoc(collection(db, "households"), {
+          name: "My Household",
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+          created_by: user.uid
+        });
+        
+        householdId = householdRef.id;
+        
+        // Create household membership
+        await addDoc(collection(db, "household_members"), {
+          household_id: householdId,
+          profile_id: user.uid,
+          role: "owner",
+          created_at: serverTimestamp()
+        });
+        
+        console.log("Created new household with ID:", householdId);
+        setAccounts([]);
         setLoading(false);
         return;
+      } else {
+        householdId = householdSnapshot.docs[0].data().household_id;
       }
-      
-      const householdId = householdSnapshot.docs[0].data().household_id;
       
       // Then get accounts in that household using the nested collection path
       const accountsQuery = query(
@@ -106,6 +131,9 @@ export default function AccountsPage() {
       setAccounts(accountsList);
     } catch (error) {
       console.error("Error fetching accounts:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
       toast.error("Failed to load accounts");
     } finally {
       setLoading(false);
@@ -131,14 +159,34 @@ export default function AccountsPage() {
       console.log("Fetching household for user:", user.uid);
       const householdSnapshot = await getDocs(householdQuery);
       
-      if (householdSnapshot.empty) {
-        console.error("No household found for user", user.uid);
-        toast.error("No household found for this user");
-        return;
-      }
+      let householdId: string;
       
-      const householdId = householdSnapshot.docs[0].data().household_id;
-      console.log("Found household ID:", householdId);
+      if (householdSnapshot.empty) {
+        console.log("No household found for user, creating a new household");
+        
+        // Create a new household
+        const householdRef = await addDoc(collection(db, "households"), {
+          name: "My Household",
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+          created_by: user.uid
+        });
+        
+        householdId = householdRef.id;
+        
+        // Create household membership
+        await addDoc(collection(db, "household_members"), {
+          household_id: householdId,
+          profile_id: user.uid,
+          role: "owner",
+          created_at: serverTimestamp()
+        });
+        
+        console.log("Created new household with ID:", householdId);
+      } else {
+        householdId = householdSnapshot.docs[0].data().household_id;
+        console.log("Found household ID:", householdId);
+      }
 
       // Prepare the account data
       const accountData = {
@@ -161,6 +209,9 @@ export default function AccountsPage() {
       fetchAccounts();
     } catch (error) {
       console.error("Error adding account:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", error.message, error.stack);
+      }
       toast.error("Failed to add account: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };

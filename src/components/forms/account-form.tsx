@@ -34,8 +34,8 @@ const accountFormSchema = z.object({
   }),
   balance: z.coerce.number().default(0),
   currency: z.string().default("USD"),
-  institution: z.string().optional(),
-  account_number: z.string().optional(),
+  institution: z.string().optional().nullable(),
+  account_number: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
   is_default: z.boolean().default(false),
 });
@@ -86,7 +86,7 @@ export function AccountForm({
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues,
-    mode: "onChange",
+    mode: "onSubmit",
   });
 
   const handleBalanceChange = (value: string) => {
@@ -99,10 +99,16 @@ export function AccountForm({
   const handleSubmit = (values: AccountFormValues) => {
     console.log("Form submission triggered with values:", values);
     try {
-      onSubmit({
+      // Fill in any missing optional values
+      const finalValues = {
         ...values,
         balance: values.balance || 0,
-      });
+        institution: values.institution || "",
+        account_number: values.account_number || "",
+      };
+      
+      console.log("Submitting final values:", finalValues);
+      onSubmit(finalValues);
       console.log("onSubmit handler called successfully");
     } catch (error) {
       console.error("Error in form submission handler:", error);
@@ -296,7 +302,19 @@ export function AccountForm({
           <Button 
             type="submit" 
             disabled={isSubmitting}
-            onClick={() => console.log("Submit button clicked, form state:", form.getValues(), "Form valid:", form.formState.isValid)}
+            onClick={() => {
+              const formState = form.getValues();
+              const isValid = form.formState.isValid;
+              const errors = form.formState.errors;
+              console.log("Submit button clicked, form state:", formState);
+              console.log("Form validation errors:", errors);
+              console.log("Form valid:", isValid);
+              
+              // If form is invalid, trigger validation
+              if (!isValid) {
+                form.trigger();
+              }
+            }}
           >
             {isSubmitting
               ? "Saving..."
